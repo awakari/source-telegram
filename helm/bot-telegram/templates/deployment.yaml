@@ -46,35 +46,22 @@ spec:
               value: "{{ .Values.api.writer.uri }}"
             - name: LOG_LEVEL
               value: "{{ .Values.log.level }}"
+          stdin: true
+          tty: true
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
           livenessProbe:
-            httpGet:
-              path: "/healthz"
-              port: {{ .Values.service.port }}
+            exec:
+              command:
+                - ls
           readinessProbe:
-            httpGet:
-              path: "/healthz"
-              port: {{ .Values.service.port }}
+            exec:
+              command:
+                - ls
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          volumeMounts:
-            - name: server-cert
-              mountPath: "/etc/server-cert"
-              readOnly: true
-      volumes:
-        - name: server-cert
-          secret:
-            secretName: secret-producer-telegram-tls-server
-            items:
-              - key: tls.crt
-                path: tls.crt
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

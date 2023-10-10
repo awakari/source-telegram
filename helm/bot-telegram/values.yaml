@@ -40,26 +40,13 @@ service:
   port: 8080
 
 ingress:
-  enabled: true
-  grpc:
-    header:
-      tlsClientDn: "X-Awakari-Group-Id"
-    timeout:
-      body: "86400s"
-      read: "86400s"
-      send: "86400s"
-  http:
-    header:
-      tlsClientDn: "X-Awakari-Group-Id"
+  enabled: false
   hosts:
     - host: producer-telegram.local
       paths:
         - path: /
           pathType: ImplementationSpecific
-  tls:
-    - secretName: secret-producer-telegram-tls-server
-      hosts:
-        - producer-telegram.local
+  tls: []
 
 resources:
   requests:
