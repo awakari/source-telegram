@@ -43,5 +43,8 @@ RUN apk upgrade --no-cache && \
 WORKDIR /app
 
 COPY --from=go-builder /src/app .
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
+        screen
 
-CMD ["./app"]
+CMD ["screen", "-d", "-m", "./app"]
