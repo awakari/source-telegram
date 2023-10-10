@@ -35,7 +35,7 @@ func main() {
 	authorizer := client.ClientAuthorizer()
 	go client.CliInteractor(authorizer)
 	authorizer.TdlibParameters <- &client.SetTdlibParametersRequest{
-		UseTestDc:          true,
+		UseTestDc:          false,
 		UseSecretChats:     false,
 		ApiId:              cfg.Api.Telegram.Id,
 		ApiHash:            cfg.Api.Telegram.Hash,
