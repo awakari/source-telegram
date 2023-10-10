@@ -43,7 +43,7 @@ const attrKeyFileType = "tgfiletype"
 
 var errNoAck = errors.New("event was not accepted")
 
-func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudEvent]) handler.Handler[*client.UpdateNewMessage] {
+func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudEvent]) handler.Handler[*client.UpdateChatLastMessage] {
 	return msgHandler{
 		chatNameById: chatNameById,
 		writerAwk:    writerAwk,
@@ -51,8 +51,8 @@ func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudE
 	}
 }
 
-func (h msgHandler) Handle(u *client.UpdateNewMessage) (err error) {
-	msg := u.Message
+func (h msgHandler) Handle(u *client.UpdateChatLastMessage) (err error) {
+	msg := u.LastMessage
 	chatName, chatOk := h.chatNameById[msg.ChatId]
 	if chatOk {
 		err = h.handleMessage(chatName, msg)
