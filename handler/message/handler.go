@@ -43,7 +43,7 @@ const attrKeyFileType = "tgfiletype"
 
 var errNoAck = errors.New("event was not accepted")
 
-func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudEvent]) handler.Handler[*client.UpdateChatLastMessage] {
+func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudEvent]) handler.Handler[*client.Message] {
 	return msgHandler{
 		chatNameById: chatNameById,
 		writerAwk:    writerAwk,
@@ -51,10 +51,10 @@ func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudE
 	}
 }
 
-func (h msgHandler) Handle(u *client.UpdateChatLastMessage) (err error) {
-	msg := u.LastMessage
+func (h msgHandler) Handle(msg *client.Message) (err error) {
 	chatName, chatOk := h.chatNameById[msg.ChatId]
 	if chatOk {
+		fmt.Printf("chat \"%s\" new message: %+v\n", chatName, msg)
 		err = h.handleMessage(chatName, msg)
 	}
 	return
@@ -114,6 +114,8 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 		)
 		convertVideo(v.Video, evt)
 		convertText(v.Caption, evt)
+	default:
+		fmt.Printf("unsupported message content type: %s\n", content.MessageContentType())
 	}
 	//
 	if evt.Data != nil {

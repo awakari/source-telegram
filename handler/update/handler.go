@@ -12,10 +12,10 @@ type ListenerHandler interface {
 
 type updateHandler struct {
 	listener   *client.Listener
-	msgHandler handler.Handler[*client.UpdateChatLastMessage]
+	msgHandler handler.Handler[*client.Message]
 }
 
-func NewHandler(listener *client.Listener, msgHandler handler.Handler[*client.UpdateChatLastMessage]) ListenerHandler {
+func NewHandler(listener *client.Listener, msgHandler handler.Handler[*client.Message]) ListenerHandler {
 	return updateHandler{
 		listener:   listener,
 		msgHandler: msgHandler,
@@ -26,8 +26,16 @@ func (h updateHandler) Handle(u client.Type) (err error) {
 	switch u.GetClass() {
 	case client.ClassUpdate:
 		switch u.GetType() {
+		case client.TypeUpdateNewMessage:
+			msg := u.(*client.UpdateNewMessage).Message
+			if !msg.IsOutgoing {
+				err = h.msgHandler.Handle(u.(*client.UpdateNewMessage).Message)
+			}
 		case client.TypeUpdateChatLastMessage:
-			err = h.msgHandler.Handle(u.(*client.UpdateChatLastMessage))
+			msg := u.(*client.UpdateChatLastMessage).LastMessage
+			if msg != nil {
+				err = h.msgHandler.Handle(msg)
+			}
 		}
 	}
 	return
