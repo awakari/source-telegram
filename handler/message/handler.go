@@ -54,7 +54,6 @@ func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudE
 func (h msgHandler) Handle(msg *client.Message) (err error) {
 	chatName, chatOk := h.chatNameById[msg.ChatId]
 	if chatOk {
-		fmt.Printf("chat \"%s\" new message: %+v\n", chatName, msg)
 		err = h.handleMessage(chatName, msg)
 	}
 	return
@@ -78,7 +77,7 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 	//
 	content := msg.Content
 	switch content.MessageContentType() {
-	case client.TypeAudio:
+	case client.TypeMessageAudio:
 		a := content.(*client.MessageAudio)
 		fmt.Printf(
 			"chat: \"%s\", message: %d, audio, caption: %s, file id: %d, title: %s, duration: %d",
@@ -86,7 +85,7 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 		)
 		convertAudio(a.Audio, evt)
 		convertText(a.Caption, evt)
-	case client.TypeDocument:
+	case client.TypeMessageDocument:
 		doc := content.(*client.MessageDocument)
 		fmt.Printf(
 			"chat: \"%s\", message: %d, document, caption: %s, file id: %d",
@@ -94,7 +93,7 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 		)
 		convertDocument(doc.Document, evt)
 		convertText(doc.Caption, evt)
-	case client.TypePhoto:
+	case client.TypeMessagePhoto:
 		img := content.(*client.MessagePhoto)
 		fmt.Printf(
 			"chat: \"%s\", message: %d, image, caption: %s, file id: %d, width: %d, height: %d",
@@ -102,11 +101,11 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 		)
 		convertImage(img.Photo.Sizes[0], evt)
 		convertText(img.Caption, evt)
-	case client.TypeText:
+	case client.TypeMessageText:
 		txt := content.(*client.MessageText)
 		fmt.Printf("chat: \"%s\", message: %d, text: %s", chatName, msg.Id, txt.Text.Text)
 		convertText(txt.Text, evt)
-	case client.TypeVideo:
+	case client.TypeMessageVideo:
 		v := content.(*client.MessageVideo)
 		fmt.Printf(
 			"chat: \"%s\", message: %d, v, caption: %s, file id: %d, duration: %d, width: %d, height: %d",
