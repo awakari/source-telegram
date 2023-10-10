@@ -1,0 +1,93 @@
+# Default values for producer-telegram.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/awakari/producer-telegram
+  pullPolicy: Always
+  tag: "latest"
+imagePullSecrets:
+  - name: github-registry
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  grpc:
+    header:
+      tlsClientDn: "X-Awakari-Group-Id"
+    timeout:
+      body: "86400s"
+      read: "86400s"
+      send: "86400s"
+  http:
+    header:
+      tlsClientDn: "X-Awakari-Group-Id"
+  hosts:
+    - host: producer-telegram.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls:
+    - secretName: secret-producer-telegram-tls-server
+      hosts:
+        - producer-telegram.local
+
+resources:
+  requests:
+    cpu: 2m
+    memory: 16Mi
+  limits:
+    cpu: 1000m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationValue: 1000m
+  targetMemoryUtilizationValue: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+api:
+  writer:
+    uri: "resolver:50051"
+  telegram:
+    feed:
+      chatIds: "-1001754252633,-1001260622817,-1001008241581,-1001801930101,-1001024068640"
+log:
+  # https://pkg.go.dev/golang.org/x/exp/slog#Level
+  level: -4
