@@ -70,4 +70,5 @@ jobs:
       - name: Helm Upgrade
         run: |
           helm upgrade --install ${COMPONENT} helm/package/${COMPONENT}-0.0.0.tgz \
+            --values helm/producer-telegram/values-demo-0.yaml \
             --set podAnnotations.commit=$(git rev-parse --short HEAD)

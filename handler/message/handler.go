@@ -74,7 +74,6 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 			},
 		},
 	}
-	//
 	convertSource(msg, evt)
 	//
 	content := msg.Content
@@ -117,20 +116,23 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 		convertText(v.Caption, evt)
 	}
 	//
-	evts := []*pb.CloudEvent{
-		evt,
+	if evt.Data != nil {
+		fmt.Printf("New message id %d: converted to event id = %s\n", msg.Id, evt.Id)
+		evts := []*pb.CloudEvent{
+			evt,
+		}
+		err = backoff.Retry(
+			func() (err error) {
+				var ackCount uint32
+				ackCount, err = h.writerAwk.WriteBatch(evts)
+				if ackCount < 1 {
+					err = errNoAck
+				}
+				return
+			},
+			h.b,
+		)
 	}
-	err = backoff.Retry(
-		func() (err error) {
-			var ackCount uint32
-			ackCount, err = h.writerAwk.WriteBatch(evts)
-			if ackCount < 1 {
-				err = errNoAck
-			}
-			return
-		},
-		h.b,
-	)
 	return
 }
 
