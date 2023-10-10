@@ -47,4 +47,4 @@ RUN apk upgrade --no-cache && \
     apk add --no-cache \
         screen
 
-CMD ["screen", "-d", "-m", "./app"]
+CMD ["sleep", "infinity"]
