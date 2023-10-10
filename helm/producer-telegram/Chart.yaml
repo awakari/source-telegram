@@ -1,6 +1,6 @@
 apiVersion: v2
 name: producer-telegram
-description: A Helm chart for Awakari Telegram Bot
+description: A Helm chart for Awakari Telegram Producer
 
 # A chart can be either an 'application' or a 'library' chart.
 #
