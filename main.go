@@ -102,9 +102,10 @@ func main() {
 			}
 		}
 		if err == nil {
-			log.Info(fmt.Sprintf("Chat link: %s", link.Link))
 			l := link.Link
-			chatById[chatId] = l[:strings.LastIndex(l, "/")]
+			l = l[:strings.LastIndex(l, "/")]
+			log.Info(fmt.Sprintf("Chat link: %s", l))
+			chatById[chatId] = l
 		}
 		if err != nil {
 			log.Error(fmt.Sprintf("Failed to get chat by id: %d, cause: %s", chatId, err))
