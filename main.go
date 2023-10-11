@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -75,54 +74,18 @@ func main() {
 	}
 
 	// load the configured chats info
-	chatLinkById := map[int64]string{}
-	var chat *client.Chat
+	chats := map[int64]bool{}
 	for _, chatId := range cfg.Api.Telegram.Feed.ChatIds {
+		var chat *client.Chat
 		chat, err = clientTg.GetChat(&client.GetChatRequest{
 			ChatId: chatId,
 		})
-		var link *client.MessageLink
 		if err == nil {
-			if chat.LastMessage != nil {
-				link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
-					ChatId:    chatId,
-					MessageId: chat.LastMessage.Id,
-				})
-				if strings.HasPrefix(link.Link, "https://t.me/c/") {
-					// last message does not belong to a channel, discard
-					link = nil
-				}
-			}
-			if link == nil {
-				link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
-					ChatId:    chatId,
-					MessageId: chat.LastReadInboxMessageId,
-				})
-				if err != nil {
-					link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
-						ChatId:    chatId,
-						MessageId: chat.LastReadOutboxMessageId,
-					})
-				}
-			}
-		}
-		if err == nil {
-			var l string
-			if link == nil {
-				l = chat.Title // fallback: chat title instead of the link
-			} else {
-				l = link.Link
-				if strings.HasPrefix(l, "https://t.me/c/") {
-					l = chat.Title // fallback: chat title instead of the link
-				} else {
-					l = l[:strings.LastIndex(l, "/")]
-				}
-			}
-			log.Info(fmt.Sprintf("Chat link: %s", l))
-			chatLinkById[chatId] = l
+			log.Info(fmt.Sprintf("Allowed chat id: %d, title: %s", chatId, chat.Title))
+			chats[chatId] = true
 		}
 		if err != nil {
-			log.Error(fmt.Sprintf("Failed to get chat link by id: %d, cause: %s", chatId, err))
+			log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", chatId, err))
 		}
 	}
 
@@ -153,7 +116,7 @@ func main() {
 	}
 
 	// init handlers
-	msgHandler := message.NewHandler(chatLinkById, w, log)
+	msgHandler := message.NewHandler(clientTg, chats, w, log)
 
 	//
 	listener := clientTg.GetListener()

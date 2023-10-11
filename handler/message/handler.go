@@ -14,10 +14,11 @@ import (
 )
 
 type msgHandler struct {
-	chatLinkById map[int64]string
-	writerAwk    model.Writer[*pb.CloudEvent]
-	b            *backoff.ExponentialBackOff
-	log          *slog.Logger
+	clientTg  *client.Client
+	chats     map[int64]bool
+	writerAwk model.Writer[*pb.CloudEvent]
+	b         *backoff.ExponentialBackOff
+	log       *slog.Logger
 }
 
 type FileType int32
@@ -33,7 +34,6 @@ const (
 const attrValType = "com.github.awakari.producer-telegram"
 const attrValSpecVersion = "1.0"
 const attrKeyMsgId = "telegrammessageid"
-const fmtLinkChatMsg = "\"%s\""
 
 // file attrs
 const attrKeyFileId = "tgfileid"
@@ -45,24 +45,24 @@ const attrKeyFileType = "tgfiletype"
 
 var errNoAck = errors.New("event was not accepted")
 
-func NewHandler(chatLinkById map[int64]string, writerAwk model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*client.Message] {
+func NewHandler(clientTg *client.Client, chats map[int64]bool, writerAwk model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*client.Message] {
 	return msgHandler{
-		chatLinkById: chatLinkById,
-		writerAwk:    writerAwk,
-		b:            backoff.NewExponentialBackOff(),
-		log:          log,
+		chats:     chats,
+		writerAwk: writerAwk,
+		b:         backoff.NewExponentialBackOff(),
+		log:       log,
 	}
 }
 
 func (h msgHandler) Handle(msg *client.Message) (err error) {
-	chatLink, chatOk := h.chatLinkById[msg.ChatId]
+	_, chatOk := h.chats[msg.ChatId]
 	if chatOk {
-		err = h.handleMessage(chatLink, msg)
+		err = h.handleMessage(msg)
 	}
 	return
 }
 
-func (h msgHandler) handleMessage(chatLink string, msg *client.Message) (err error) {
+func (h msgHandler) handleMessage(msg *client.Message) (err error) {
 	//
 	evt := &pb.CloudEvent{
 		Id:          uuid.NewString(),
@@ -76,7 +76,8 @@ func (h msgHandler) handleMessage(chatLink string, msg *client.Message) (err err
 			},
 		},
 	}
-	convertSource(msg, chatLink, evt)
+	//
+	err = h.convertSource(msg, evt)
 	//
 	content := msg.Content
 	switch content.MessageContentType() {
@@ -104,7 +105,7 @@ func (h msgHandler) handleMessage(chatLink string, msg *client.Message) (err err
 	}
 	//
 	if evt.Data != nil {
-		h.log.Info(fmt.Sprintf("New message %+v from chat %d: converted to event id: %s, source: %s\n", msg, msg.ChatId, evt.Id, evt.Source))
+		h.log.Debug(fmt.Sprintf("New message %d from chat %d: converted to event id: %s, source: %s\n", msg.Id, msg.ChatId, evt.Id, evt.Source))
 		evts := []*pb.CloudEvent{
 			evt,
 		}
@@ -123,12 +124,19 @@ func (h msgHandler) handleMessage(chatLink string, msg *client.Message) (err err
 	return
 }
 
-func convertSource(msg *client.Message, chatLink string, evt *pb.CloudEvent) {
-	senderId := msg.SenderId
-	switch senderId.MessageSenderType() {
-	case client.TypeMessageSenderChat:
-		evt.Source = fmt.Sprintf("%s/%d", chatLink, msg.Id)
+func (h msgHandler) convertSource(msg *client.Message, evt *pb.CloudEvent) (err error) {
+	var link *client.MessageLink
+	link, err = h.clientTg.GetMessageLink(&client.GetMessageLinkRequest{
+		ChatId:    msg.ChatId,
+		MessageId: msg.Id,
+	})
+	switch err {
+	case nil:
+		evt.Source = link.Link
+	default:
+		evt.Source = strconv.FormatInt(msg.Id, 10)
 	}
+	return
 }
 
 func convertAudio(a *client.Audio, evt *pb.CloudEvent) {
