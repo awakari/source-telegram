@@ -82,38 +82,21 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 	switch content.MessageContentType() {
 	case client.TypeMessageAudio:
 		a := content.(*client.MessageAudio)
-		h.log.Info(fmt.Sprintf(
-			"chat: \"%s\", message: %d, audio, caption: %s, file id: %d, title: %s, duration: %d",
-			chatName, msg.Id, a.Caption.Text, a.Audio.Audio.Id, a.Audio.Title, a.Audio.Duration,
-		))
 		convertAudio(a.Audio, evt)
 		convertText(a.Caption, evt)
 	case client.TypeMessageDocument:
 		doc := content.(*client.MessageDocument)
-		h.log.Info(fmt.Sprintf(
-			"chat: \"%s\", message: %d, document, caption: %s, file id: %d",
-			chatName, msg.Id, doc.Caption.Text, doc.Document.Document.Id,
-		))
 		convertDocument(doc.Document, evt)
 		convertText(doc.Caption, evt)
 	case client.TypeMessagePhoto:
 		img := content.(*client.MessagePhoto)
-		h.log.Info(fmt.Sprintf(
-			"chat: \"%s\", message: %d, image, caption: %s, file id: %d, width: %d, height: %d",
-			chatName, msg.Id, img.Caption.Text, img.Photo.Sizes[0].Photo.Id, img.Photo.Sizes[0].Width, img.Photo.Sizes[0].Height,
-		))
 		convertImage(img.Photo.Sizes[0], evt)
 		convertText(img.Caption, evt)
 	case client.TypeMessageText:
 		txt := content.(*client.MessageText)
-		h.log.Info(fmt.Sprintf("chat: \"%s\", message: %d, text: %s", chatName, msg.Id, txt.Text.Text))
 		convertText(txt.Text, evt)
 	case client.TypeMessageVideo:
 		v := content.(*client.MessageVideo)
-		h.log.Info(fmt.Sprintf(
-			"chat: \"%s\", message: %d, v, caption: %s, file id: %d, duration: %d, width: %d, height: %d",
-			chatName, msg.Id, v.Caption.Text, v.Video.Video.Id, v.Video.Duration, v.Video.Width, v.Video.Height,
-		))
 		convertVideo(v.Video, evt)
 		convertText(v.Caption, evt)
 	default:
@@ -121,7 +104,7 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 	}
 	//
 	if evt.Data != nil {
-		h.log.Info(fmt.Sprintf("New message id %d: converted to event id = %s\n", msg.Id, evt.Id))
+		h.log.Info(fmt.Sprintf("New message id %d from chat %d: converted to event id = %s\n", msg.Id, msg.ChatId, evt.Id))
 		evts := []*pb.CloudEvent{
 			evt,
 		}

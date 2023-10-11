@@ -77,7 +77,7 @@ func main() {
 			ChatId: chatId,
 		})
 		if err == nil {
-			log.Info(fmt.Sprintf("Chat id: %d, title: %s", chatId, chat.Title))
+			log.Info(fmt.Sprintf("Chat: %+v", chat))
 		}
 	}
 
