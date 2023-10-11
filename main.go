@@ -112,13 +112,17 @@ func main() {
 				l = chat.Title // fallback: chat title instead of the link
 			} else {
 				l = link.Link
-				l = l[:strings.LastIndex(l, "/")]
+				if strings.HasPrefix(l, "https://t.me/c/") {
+					l = chat.Title // fallback: chat title instead of the link
+				} else {
+					l = l[:strings.LastIndex(l, "/")]
+				}
 			}
 			log.Info(fmt.Sprintf("Chat link: %s", l))
 			chatLinkById[chatId] = l
 		}
 		if err != nil {
-			log.Error(fmt.Sprintf("Failed to get chat by id: %d, cause: %s", chatId, err))
+			log.Error(fmt.Sprintf("Failed to get chat link by id: %d, cause: %s", chatId, err))
 		}
 	}
 
