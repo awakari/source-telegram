@@ -33,7 +33,7 @@ const (
 const attrValType = "com.github.awakari.producer-telegram"
 const attrValSpecVersion = "1.0"
 const attrKeyMsgId = "telegrammessageid"
-const fmtLinkChatMsg = "https://t.me/%s/%d"
+const fmtLinkChatMsg = "\"%s\""
 
 // file attrs
 const attrKeyFileId = "tgfileid"
@@ -144,7 +144,7 @@ func convertSource(msg *client.Message, chatName string, evt *pb.CloudEvent) {
 	senderId := msg.SenderId
 	switch senderId.MessageSenderType() {
 	case client.TypeMessageSenderChat:
-		evt.Source = fmt.Sprintf(fmtLinkChatMsg, chatName, msg.Id)
+		evt.Source = fmt.Sprintf(fmtLinkChatMsg, chatName)
 	}
 }
 
