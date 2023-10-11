@@ -33,7 +33,7 @@ const (
 
 const attrValType = "com.github.awakari.producer-telegram"
 const attrValSpecVersion = "1.0"
-const attrKeyMsgId = "telegrammessageid"
+const attrKeyMsgId = "tgmessageid"
 
 // file attrs
 const attrKeyFileId = "tgfileid"
