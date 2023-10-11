@@ -127,7 +127,7 @@ func convertSource(msg *client.Message, chatLink string, evt *pb.CloudEvent) {
 	senderId := msg.SenderId
 	switch senderId.MessageSenderType() {
 	case client.TypeMessageSenderChat:
-		evt.Source = chatLink
+		evt.Source = fmt.Sprintf("%s/%d", chatLink, msg.MessageThreadId)
 	}
 }
 
