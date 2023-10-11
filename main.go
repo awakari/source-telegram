@@ -88,8 +88,14 @@ func main() {
 		chat, err = clientTg.GetChat(&client.GetChatRequest{
 			ChatId: chatId,
 		})
+		var link *client.MessageLink
+		link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
+			ChatId:    chatId,
+			MessageId: chat.LastReadInboxMessageId,
+		})
 		if err == nil {
-			chatById[chatId] = chat.Title
+			log.Info(fmt.Sprintf("Chat link: %s", link.Link))
+			chatById[chatId] = link.Link
 		}
 		if err != nil {
 			log.Error(fmt.Sprintf("Failed to get chat by id: %d, cause: %s", chatId, err))
@@ -115,8 +121,7 @@ func main() {
 	)
 	w, err := clientAwk.OpenMessagesWriter(groupIdCtx, "producer-telegram")
 	if err != nil {
-		log.Error(fmt.Sprintf("failed to open the Awakari events writer: %s", err))
-		// TODO panic
+		panic(fmt.Sprintf("failed to open the Awakari events writer: %s", err))
 	}
 	if err == nil {
 		defer w.Close()
