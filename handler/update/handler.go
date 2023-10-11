@@ -31,11 +31,6 @@ func (h updateHandler) Handle(u client.Type) (err error) {
 			if !msg.IsOutgoing {
 				err = h.msgHandler.Handle(u.(*client.UpdateNewMessage).Message)
 			}
-		case client.TypeUpdateChatLastMessage:
-			msg := u.(*client.UpdateChatLastMessage).LastMessage
-			if msg != nil {
-				err = h.msgHandler.Handle(msg)
-			}
 		}
 	}
 	return
