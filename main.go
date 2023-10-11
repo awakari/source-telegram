@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -68,17 +69,9 @@ func main() {
 	log.Info(fmt.Sprintf("Me: %s %s [%v]", me.FirstName, me.LastName, me.Usernames))
 
 	// get all chats into the cache - get chat by id won't work w/o this
-	chats, err := clientTg.GetChats(&client.GetChatsRequest{Limit: 0x100})
+	_, err = clientTg.GetChats(&client.GetChatsRequest{Limit: 0x100})
 	if err != nil {
 		panic(err)
-	}
-	for _, chatId := range chats.ChatIds {
-		chat, err := clientTg.GetChat(&client.GetChatRequest{
-			ChatId: chatId,
-		})
-		if err == nil {
-			log.Info(fmt.Sprintf("Chat: %+v", chat))
-		}
 	}
 
 	// load the configured chats info
@@ -89,13 +82,29 @@ func main() {
 			ChatId: chatId,
 		})
 		var link *client.MessageLink
-		link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
-			ChatId:    chatId,
-			MessageId: chat.LastReadInboxMessageId,
-		})
+		if err == nil {
+			if chat.LastMessage != nil {
+				link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
+					ChatId:    chatId,
+					MessageId: chat.LastMessage.Id,
+				})
+			} else {
+				link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
+					ChatId:    chatId,
+					MessageId: chat.LastReadInboxMessageId,
+				})
+				if err != nil {
+					link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
+						ChatId:    chatId,
+						MessageId: chat.LastReadOutboxMessageId,
+					})
+				}
+			}
+		}
 		if err == nil {
 			log.Info(fmt.Sprintf("Chat link: %s", link.Link))
-			chatById[chatId] = link.Link
+			l := link.Link
+			chatById[chatId] = l[:strings.LastIndex(l, "/")]
 		}
 		if err != nil {
 			log.Error(fmt.Sprintf("Failed to get chat by id: %d, cause: %s", chatId, err))
