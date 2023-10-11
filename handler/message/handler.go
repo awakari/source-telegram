@@ -104,7 +104,7 @@ func (h msgHandler) handleMessage(chatLink string, msg *client.Message) (err err
 	}
 	//
 	if evt.Data != nil {
-		h.log.Info(fmt.Sprintf("New message id %d from chat %d: converted to event id: %s, source: %s\n", msg.Id, msg.ChatId, evt.Id, evt.Source))
+		h.log.Info(fmt.Sprintf("New message %+v from chat %d: converted to event id: %s, source: %s\n", msg, msg.ChatId, evt.Id, evt.Source))
 		evts := []*pb.CloudEvent{
 			evt,
 		}
@@ -127,7 +127,7 @@ func convertSource(msg *client.Message, chatLink string, evt *pb.CloudEvent) {
 	senderId := msg.SenderId
 	switch senderId.MessageSenderType() {
 	case client.TypeMessageSenderChat:
-		evt.Source = fmt.Sprintf("%s/%d", chatLink, msg.MessageThreadId)
+		evt.Source = fmt.Sprintf("%s/%d", chatLink, msg.Id)
 	}
 }
 
