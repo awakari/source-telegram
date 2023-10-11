@@ -14,7 +14,7 @@ import (
 )
 
 type msgHandler struct {
-	chatNameById map[int64]string
+	chatLinkById map[int64]string
 	writerAwk    model.Writer[*pb.CloudEvent]
 	b            *backoff.ExponentialBackOff
 	log          *slog.Logger
@@ -45,9 +45,9 @@ const attrKeyFileType = "tgfiletype"
 
 var errNoAck = errors.New("event was not accepted")
 
-func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*client.Message] {
+func NewHandler(chatLinkById map[int64]string, writerAwk model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*client.Message] {
 	return msgHandler{
-		chatNameById: chatNameById,
+		chatLinkById: chatLinkById,
 		writerAwk:    writerAwk,
 		b:            backoff.NewExponentialBackOff(),
 		log:          log,
@@ -55,14 +55,14 @@ func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudE
 }
 
 func (h msgHandler) Handle(msg *client.Message) (err error) {
-	chatName, chatOk := h.chatNameById[msg.ChatId]
+	chatLink, chatOk := h.chatLinkById[msg.ChatId]
 	if chatOk {
-		err = h.handleMessage(chatName, msg)
+		err = h.handleMessage(chatLink, msg)
 	}
 	return
 }
 
-func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err error) {
+func (h msgHandler) handleMessage(chatLink string, msg *client.Message) (err error) {
 	//
 	evt := &pb.CloudEvent{
 		Id:          uuid.NewString(),
@@ -76,7 +76,7 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 			},
 		},
 	}
-	convertSource(msg, chatName, evt)
+	convertSource(msg, chatLink, evt)
 	//
 	content := msg.Content
 	switch content.MessageContentType() {
@@ -123,11 +123,11 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 	return
 }
 
-func convertSource(msg *client.Message, chatName string, evt *pb.CloudEvent) {
+func convertSource(msg *client.Message, chatLink string, evt *pb.CloudEvent) {
 	senderId := msg.SenderId
 	switch senderId.MessageSenderType() {
 	case client.TypeMessageSenderChat:
-		evt.Source = fmt.Sprintf(fmtLinkChatMsg, chatName)
+		evt.Source = chatLink
 	}
 }
 

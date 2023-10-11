@@ -75,7 +75,7 @@ func main() {
 	}
 
 	// load the configured chats info
-	chatById := map[int64]string{}
+	chatLinkById := map[int64]string{}
 	var chat *client.Chat
 	for _, chatId := range cfg.Api.Telegram.Feed.ChatIds {
 		chat, err = clientTg.GetChat(&client.GetChatRequest{
@@ -105,7 +105,7 @@ func main() {
 			l := link.Link
 			l = l[:strings.LastIndex(l, "/")]
 			log.Info(fmt.Sprintf("Chat link: %s", l))
-			chatById[chatId] = l
+			chatLinkById[chatId] = l
 		}
 		if err != nil {
 			log.Error(fmt.Sprintf("Failed to get chat by id: %d, cause: %s", chatId, err))
@@ -139,7 +139,7 @@ func main() {
 	}
 
 	// init handlers
-	msgHandler := message.NewHandler(chatById, w, log)
+	msgHandler := message.NewHandler(chatLinkById, w, log)
 
 	//
 	listener := clientTg.GetListener()
