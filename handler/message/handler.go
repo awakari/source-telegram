@@ -47,6 +47,7 @@ var errNoAck = errors.New("event was not accepted")
 
 func NewHandler(clientTg *client.Client, chats map[int64]bool, writerAwk model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*client.Message] {
 	return msgHandler{
+		clientTg:  clientTg,
 		chats:     chats,
 		writerAwk: writerAwk,
 		b:         backoff.NewExponentialBackOff(),
