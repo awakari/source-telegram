@@ -41,7 +41,7 @@ spec:
                   name: "{{ include "producer-telegram.fullname" . }}-tokens"
                   key: hash
             - name: API_TELEGRAM_FEED_CHAT_IDS
-              value: "{{ .Values.api.telegram.feed.chatIds }}"
+              value: "{{ join "," .Values.api.telegram.feed.chatIds }}"
             - name: API_WRITER_URI
               value: "{{ .Values.api.writer.uri }}"
             - name: LOG_LEVEL

@@ -68,7 +68,7 @@ func main() {
 	log.Info(fmt.Sprintf("Me: %s %s [%v]", me.FirstName, me.LastName, me.Usernames))
 
 	// get all chats into the cache - get chat by id won't work w/o this
-	chats, err := clientTg.GetChats(&client.GetChatsRequest{Limit: 100})
+	chats, err := clientTg.GetChats(&client.GetChatsRequest{Limit: 0x100})
 	if err != nil {
 		panic(err)
 	}
@@ -124,7 +124,7 @@ func main() {
 	}
 
 	// init handlers
-	msgHandler := message.NewHandler(chatById, w)
+	msgHandler := message.NewHandler(chatById, w, log)
 
 	//
 	listener := clientTg.GetListener()

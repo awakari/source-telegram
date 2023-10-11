@@ -9,6 +9,7 @@ import (
 	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
 	"github.com/google/uuid"
 	"github.com/zelenin/go-tdlib/client"
+	"log/slog"
 	"strconv"
 )
 
@@ -16,6 +17,7 @@ type msgHandler struct {
 	chatNameById map[int64]string
 	writerAwk    model.Writer[*pb.CloudEvent]
 	b            *backoff.ExponentialBackOff
+	log          *slog.Logger
 }
 
 type FileType int32
@@ -31,7 +33,7 @@ const (
 const attrValType = "com.github.awakari.producer-telegram"
 const attrValSpecVersion = "1.0"
 const attrKeyMsgId = "telegrammessageid"
-const fmtLinkChatMsg = "https://t.me/c/%d/%d"
+const fmtLinkChatMsg = "https://t.me/%s/%d"
 
 // file attrs
 const attrKeyFileId = "tgfileid"
@@ -43,11 +45,12 @@ const attrKeyFileType = "tgfiletype"
 
 var errNoAck = errors.New("event was not accepted")
 
-func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudEvent]) handler.Handler[*client.Message] {
+func NewHandler(chatNameById map[int64]string, writerAwk model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*client.Message] {
 	return msgHandler{
 		chatNameById: chatNameById,
 		writerAwk:    writerAwk,
 		b:            backoff.NewExponentialBackOff(),
+		log:          log,
 	}
 }
 
@@ -73,52 +76,52 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 			},
 		},
 	}
-	convertSource(msg, evt)
+	convertSource(msg, chatName, evt)
 	//
 	content := msg.Content
 	switch content.MessageContentType() {
 	case client.TypeMessageAudio:
 		a := content.(*client.MessageAudio)
-		fmt.Printf(
+		h.log.Info(fmt.Sprintf(
 			"chat: \"%s\", message: %d, audio, caption: %s, file id: %d, title: %s, duration: %d",
 			chatName, msg.Id, a.Caption.Text, a.Audio.Audio.Id, a.Audio.Title, a.Audio.Duration,
-		)
+		))
 		convertAudio(a.Audio, evt)
 		convertText(a.Caption, evt)
 	case client.TypeMessageDocument:
 		doc := content.(*client.MessageDocument)
-		fmt.Printf(
+		h.log.Info(fmt.Sprintf(
 			"chat: \"%s\", message: %d, document, caption: %s, file id: %d",
 			chatName, msg.Id, doc.Caption.Text, doc.Document.Document.Id,
-		)
+		))
 		convertDocument(doc.Document, evt)
 		convertText(doc.Caption, evt)
 	case client.TypeMessagePhoto:
 		img := content.(*client.MessagePhoto)
-		fmt.Printf(
+		h.log.Info(fmt.Sprintf(
 			"chat: \"%s\", message: %d, image, caption: %s, file id: %d, width: %d, height: %d",
 			chatName, msg.Id, img.Caption.Text, img.Photo.Sizes[0].Photo.Id, img.Photo.Sizes[0].Width, img.Photo.Sizes[0].Height,
-		)
+		))
 		convertImage(img.Photo.Sizes[0], evt)
 		convertText(img.Caption, evt)
 	case client.TypeMessageText:
 		txt := content.(*client.MessageText)
-		fmt.Printf("chat: \"%s\", message: %d, text: %s", chatName, msg.Id, txt.Text.Text)
+		h.log.Info(fmt.Sprintf("chat: \"%s\", message: %d, text: %s", chatName, msg.Id, txt.Text.Text))
 		convertText(txt.Text, evt)
 	case client.TypeMessageVideo:
 		v := content.(*client.MessageVideo)
-		fmt.Printf(
+		h.log.Info(fmt.Sprintf(
 			"chat: \"%s\", message: %d, v, caption: %s, file id: %d, duration: %d, width: %d, height: %d",
 			chatName, msg.Id, v.Caption.Text, v.Video.Video.Id, v.Video.Duration, v.Video.Width, v.Video.Height,
-		)
+		))
 		convertVideo(v.Video, evt)
 		convertText(v.Caption, evt)
 	default:
-		fmt.Printf("unsupported message content type: %s\n", content.MessageContentType())
+		h.log.Info(fmt.Sprintf("unsupported message content type: %s\n", content.MessageContentType()))
 	}
 	//
 	if evt.Data != nil {
-		fmt.Printf("New message id %d: converted to event id = %s\n", msg.Id, evt.Id)
+		h.log.Info(fmt.Sprintf("New message id %d: converted to event id = %s\n", msg.Id, evt.Id))
 		evts := []*pb.CloudEvent{
 			evt,
 		}
@@ -126,7 +129,7 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 			func() (err error) {
 				var ackCount uint32
 				ackCount, err = h.writerAwk.WriteBatch(evts)
-				if ackCount < 1 {
+				if err == nil && ackCount < 1 {
 					err = errNoAck
 				}
 				return
@@ -137,11 +140,11 @@ func (h msgHandler) handleMessage(chatName string, msg *client.Message) (err err
 	return
 }
 
-func convertSource(msg *client.Message, evt *pb.CloudEvent) {
+func convertSource(msg *client.Message, chatName string, evt *pb.CloudEvent) {
 	senderId := msg.SenderId
 	switch senderId.MessageSenderType() {
 	case client.TypeMessageSenderChat:
-		evt.Source = fmt.Sprintf(fmtLinkChatMsg, msg.ChatId, msg.Id)
+		evt.Source = fmt.Sprintf(fmtLinkChatMsg, chatName, msg.Id)
 	}
 }
 
