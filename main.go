@@ -88,7 +88,12 @@ func main() {
 					ChatId:    chatId,
 					MessageId: chat.LastMessage.Id,
 				})
-			} else {
+				if strings.HasPrefix(link.Link, "https://t.me/c/") {
+					// last message does not belong to a channel, discard
+					link = nil
+				}
+			}
+			if link == nil {
 				link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
 					ChatId:    chatId,
 					MessageId: chat.LastReadInboxMessageId,
@@ -102,8 +107,13 @@ func main() {
 			}
 		}
 		if err == nil {
-			l := link.Link
-			l = l[:strings.LastIndex(l, "/")]
+			var l string
+			if link == nil {
+				l = chat.Title // fallback: chat title instead of the link
+			} else {
+				l = link.Link
+				l = l[:strings.LastIndex(l, "/")]
+			}
 			log.Info(fmt.Sprintf("Chat link: %s", l))
 			chatLinkById[chatId] = l
 		}
