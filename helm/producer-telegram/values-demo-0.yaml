@@ -39,7 +39,7 @@ api:
         - "-1001063843030" # @offertepuntotech
         - "-1001489437372" # @offertedale
         - "-1001075905628" # @thedevs
-        - "-1001077923535 "# @googlefactss
+        - "-1001077923535" # @googlefactss
 
   writer:
     uri: "core-resolver:50051"
