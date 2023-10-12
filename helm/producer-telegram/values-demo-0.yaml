@@ -30,6 +30,16 @@ api:
         - "-1001357275556" # "Offerzone"
         - "-1001008241581" # "xkcd"
         - "-1001378813139" # Baza
+        - "-1001309924870" # @computer_science_and_programming
+        - "-1001273446931" # @Freelancer
+        - "-1001068741818" # @Sarkari_Naukri_Free_Jobs_Alert
+        - "-1001266540971" # @sgCareers
+        - "-1001488156064" # @Bloomberg
+        - "-1001606432449" # @nytimes
+        - "-1001063843030" # @offertepuntotech
+        - "-1001489437372" # @offertedale
+        - "-1001075905628" # @thedevs
+        - "-1001077923535 "# @googlefactss
 
   writer:
     uri: "core-resolver:50051"
