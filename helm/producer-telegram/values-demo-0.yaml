@@ -49,6 +49,7 @@ api:
         - "-1001103963350" # @chollometro
         - "-1001648454791" # @indirimfirsathaberleri
         - "-1001202206821" # @kino_hd2
+        - "-1001026239413" # @linuxgram
 
   writer:
     uri: "core-resolver:50051"
