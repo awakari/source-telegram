@@ -8,7 +8,6 @@ import (
 	"github.com/awakari/producer-telegram/handler/update"
 	"google.golang.org/grpc/metadata"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,7 +16,7 @@ import (
 	"github.com/awakari/client-sdk-go/api"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/zelenin/go-tdlib/client"
-	_ "net/http/pprof"
+	//_ "net/http/pprof"
 )
 
 func main() {
@@ -121,9 +120,9 @@ func main() {
 	msgHandler := message.NewHandler(clientTg, chats, w, log)
 
 	// expose the profiling
-	go func() {
-		_ = http.ListenAndServe("localhost:8080", nil)
-	}()
+	//go func() {
+	//	_ = http.ListenAndServe("localhost:6060", nil)
+	//}()
 
 	//
 	listener := clientTg.GetListener()
