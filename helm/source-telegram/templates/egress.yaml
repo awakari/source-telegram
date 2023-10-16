@@ -1,13 +1,13 @@
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
-  name: producer-telegram-allow-internet
+  name: source-telegram-allow-internet
 spec:
   policyTypes:
     - Egress
   podSelector:
     matchLabels:
-      app: producer-telegram
+      app: source-telegram
   egress:
   - to:
     - ipBlock:

@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-./producer-telegram
+./source-telegram
 cover.tmp
 
 # Test binary, built with `go test -c`
@@ -16,8 +16,8 @@ cover.tmp
 # Dependency directories (remove the comment below to include it)
 vendor/
 **/*.pb.go
-producer-telegram-*.tgz
-helm/producer-telegram/values-dev.yaml
+source-telegram-*.tgz
+helm/source-telegram/values-dev.yaml
 app.txt
 env.txt
 chat-ids-dump.txt

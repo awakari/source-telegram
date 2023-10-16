@@ -1,4 +1,4 @@
-module github.com/awakari/producer-telegram
+module github.com/awakari/source-telegram
 
 go 1.21
 

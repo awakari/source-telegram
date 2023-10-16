@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "producer-telegram.fullname" . }}
+  name: {{ include "source-telegram.fullname" . }}
   labels:
-    {{- include "producer-telegram.labels" . | nindent 4 }}
+    {{- include "source-telegram.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "producer-telegram.selectorLabels" . | nindent 6 }}
+      {{- include "source-telegram.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,13 +18,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "producer-telegram.selectorLabels" . | nindent 8 }}
+        {{- include "source-telegram.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "producer-telegram.serviceAccountName" . }}
+      serviceAccountName: {{ include "source-telegram.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -33,13 +33,18 @@ spec:
             - name: API_TELEGRAM_ID
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "producer-telegram.fullname" . }}-tokens"
+                  name: "{{ include "source-telegram.fullname" . }}-tokens"
                   key: id
             - name: API_TELEGRAM_HASH
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "producer-telegram.fullname" . }}-tokens"
+                  name: "{{ include "source-telegram.fullname" . }}-tokens"
                   key: hash
+            - name: API_TELEGRAM_PHONE
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "source-telegram.fullname" . }}-tokens"
+                  key: phone
             - name: API_TELEGRAM_FEED_CHAT_IDS
               value: "{{ join "," .Values.api.telegram.feed.chatIds }}"
             - name: API_WRITER_URI

@@ -1,7 +1,7 @@
 package update
 
 import (
-	"github.com/awakari/producer-telegram/handler"
+	"github.com/awakari/source-telegram/handler"
 	"github.com/zelenin/go-tdlib/client"
 )
 

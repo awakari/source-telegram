@@ -1,7 +1,7 @@
 .PHONY: test clean
 default: build
 
-BINARY_FILE_NAME=producer-telegram
+BINARY_FILE_NAME=source-telegram
 COVERAGE_FILE_NAME=cover.out
 COVERAGE_TMP_FILE_NAME=cover.tmp
 
@@ -25,16 +25,16 @@ build:
 	chmod ugo+x ${BINARY_FILE_NAME}
 
 docker:
-	docker build -t awakari/producer-telegram .
+	docker build -t awakari/source-telegram .
 
 run:
 	docker run \
 		--rm \
 		-it \
 		--env-file env.txt \
-		--name awakari-producer-telegram \
+		--name awakari-source-telegram \
 		--network host \
-		awakari/producer-telegram
+		awakari/source-telegram
 
 staging: docker
 	./scripts/staging.sh

@@ -1,11 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"github.com/awakari/producer-telegram/config"
-	"github.com/awakari/producer-telegram/handler/message"
-	"github.com/awakari/producer-telegram/handler/update"
+	"github.com/awakari/source-telegram/config"
+	"github.com/awakari/source-telegram/handler/message"
+	"github.com/awakari/source-telegram/handler/update"
 	"google.golang.org/grpc/metadata"
 	"log/slog"
 	"os"
@@ -34,14 +35,33 @@ func main() {
 
 	// init the Telegram client
 	authorizer := client.ClientAuthorizer()
-	go client.CliInteractor(authorizer)
+	defer authorizer.Close()
+	//
+	go func() {
+		stdOutScanner := bufio.NewReader(os.Stdout)
+		var l []byte
+		for {
+			l, _, err = stdOutScanner.ReadLine()
+			if err == nil {
+				fmt.Printf("Stdout line: %s\n", l)
+				if string(l) == "Enter phone number: " {
+					_, err = os.Stdin.WriteString(fmt.Sprintf("%s\n", cfg.Api.Telegram.Phone))
+				}
+			}
+			if err != nil {
+				panic(err)
+			}
+		}
+	}()
+	client.CliInteractor(authorizer)
+	//
 	authorizer.TdlibParameters <- &client.SetTdlibParametersRequest{
 		UseTestDc:          false,
 		UseSecretChats:     false,
 		ApiId:              cfg.Api.Telegram.Id,
 		ApiHash:            cfg.Api.Telegram.Hash,
 		SystemLanguageCode: "en",
-		DeviceModel:        "Awakari",
+		DeviceModel:        "Awakari Telegram Source",
 		SystemVersion:      "1.0.0",
 		ApplicationVersion: "1.0.0",
 	}
@@ -51,6 +71,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	//
 	clientTg, err := client.NewClient(authorizer)
 	if err != nil {
 		panic(err)
@@ -104,10 +125,10 @@ func main() {
 	//
 	groupIdCtx := metadata.AppendToOutgoingContext(
 		context.TODO(),
-		"x-awakari-group-id", "producer-telegram",
-		"x-awakari-user-id", "producer-telegram",
+		"x-awakari-group-id", "source-telegram",
+		"x-awakari-user-id", "source-telegram",
 	)
-	w, err := clientAwk.OpenMessagesWriter(groupIdCtx, "producer-telegram")
+	w, err := clientAwk.OpenMessagesWriter(groupIdCtx, "source-telegram")
 	if err != nil {
 		panic(fmt.Sprintf("failed to open the Awakari events writer: %s", err))
 	}

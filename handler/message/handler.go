@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/awakari/client-sdk-go/model"
-	"github.com/awakari/producer-telegram/handler"
+	"github.com/awakari/source-telegram/handler"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
 	"github.com/google/uuid"
@@ -31,7 +31,7 @@ const (
 	FileTypeVideo
 )
 
-const attrValType = "com.github.awakari.producer-telegram"
+const attrValType = "com.github.awakari.source-telegram"
 const attrValSpecVersion = "1.0"
 const attrKeyMsgId = "tgmessageid"
 

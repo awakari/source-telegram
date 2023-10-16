@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export SLUG=ghcr.io/awakari/producer-telegram
+export SLUG=ghcr.io/awakari/source-telegram
 export VERSION=latest
-docker tag awakari/producer-telegram "${SLUG}":"${VERSION}"
+docker tag awakari/source-telegram "${SLUG}":"${VERSION}"
 docker push "${SLUG}":"${VERSION}"
