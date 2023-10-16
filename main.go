@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"github.com/awakari/source-telegram/config"
@@ -38,19 +37,10 @@ func main() {
 	defer authorizer.Close()
 	//
 	go func() {
-		stdOutScanner := bufio.NewReader(os.Stdout)
-		var l []byte
-		for {
-			l, _, err = stdOutScanner.ReadLine()
-			if err == nil {
-				fmt.Printf("Stdout line: %s\n", l)
-				if string(l) == "Enter phone number: " {
-					_, err = os.Stdin.WriteString(fmt.Sprintf("%s\n", cfg.Api.Telegram.Phone))
-				}
-			}
-			if err != nil {
-				panic(err)
-			}
+		time.Sleep(5 * time.Second)
+		_, err = os.Stdin.WriteString(fmt.Sprintf("%s\n", cfg.Api.Telegram.Phone))
+		if err != nil {
+			panic(err)
 		}
 	}()
 	client.CliInteractor(authorizer)
