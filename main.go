@@ -34,29 +34,19 @@ func main() {
 
 	// init the Telegram client
 	authorizer := client.ClientAuthorizer()
-	defer authorizer.Close()
-	//
-	go func() {
-		time.Sleep(5 * time.Second)
-		_, err = os.Stdin.WriteString(fmt.Sprintf("%s\n", cfg.Api.Telegram.Phone))
-		if err != nil {
-			panic(err)
-		}
-	}()
-	client.CliInteractor(authorizer)
-	//
+	go client.CliInteractor(authorizer)
 	authorizer.TdlibParameters <- &client.SetTdlibParametersRequest{
 		UseTestDc:          false,
 		UseSecretChats:     false,
 		ApiId:              cfg.Api.Telegram.Id,
 		ApiHash:            cfg.Api.Telegram.Hash,
 		SystemLanguageCode: "en",
-		DeviceModel:        "Awakari Telegram Source",
+		DeviceModel:        "Awakari",
 		SystemVersion:      "1.0.0",
 		ApplicationVersion: "1.0.0",
 	}
 	_, err = client.SetLogVerbosityLevel(&client.SetLogVerbosityLevelRequest{
-		NewVerbosityLevel: 2,
+		NewVerbosityLevel: 3,
 	})
 	if err != nil {
 		panic(err)
