@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"github.com/awakari/source-telegram/config"
@@ -34,7 +35,24 @@ func main() {
 
 	// init the Telegram client
 	authorizer := client.ClientAuthorizer()
-	chCode := make(chan string) // TODO send code via gRPC
+	chCode := make(chan string)
+	go func() {
+		var tgCodeIn *os.File
+		tgCodeIn, err = os.OpenFile("tgcodein", os.O_RDONLY, os.ModeNamedPipe)
+		if err != nil {
+			panic(err)
+		}
+		defer tgCodeIn.Close()
+		tgCodeInReader := bufio.NewReader(tgCodeIn)
+		var line string
+		line, err = tgCodeInReader.ReadString('\n')
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Input line from pipe: %s\n", line)
+		chCode <- line
+	}()
+	//
 	go client.NonInteractiveCredentialsProvider(authorizer, cfg.Api.Telegram.Phone, cfg.Api.Telegram.Password, chCode)
 	authorizer.TdlibParameters <- &client.SetTdlibParametersRequest{
 		UseTestDc:          false,

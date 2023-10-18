@@ -1,4 +1,4 @@
 #!/bin/sh
 
-mkfifo pipe0
-/bin/source-telegram < pipe0
+mkfifo tgcodein
+/bin/source-telegram
