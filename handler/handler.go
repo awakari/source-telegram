@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"github.com/zelenin/go-tdlib/client"
+	"github.com/Arman92/go-tdlib"
 )
 
-type Handler[U client.Type] interface {
+type Handler[U tdlib.Update] interface {
 	Handle(u U) (err error)
 }

@@ -7,10 +7,11 @@ import (
 type Config struct {
 	Api struct {
 		Telegram struct {
-			Id    int32  `envconfig:"API_TELEGRAM_ID" required:"true"`
-			Hash  string `envconfig:"API_TELEGRAM_HASH" required:"true"`
-			Phone string `envconfig:"API_TELEGRAM_PHONE" required:"true"`
-			Feed  FeedConfig
+			Id       string `envconfig:"API_TELEGRAM_ID" required:"true"`
+			Hash     string `envconfig:"API_TELEGRAM_HASH" required:"true"`
+			Password string `envconfig:"API_TELEGRAM_PASS" default:""`
+			Phone    string `envconfig:"API_TELEGRAM_PHONE" required:"true"`
+			Feed     FeedConfig
 		}
 		Writer struct {
 			Uri string `envconfig:"API_WRITER_URI" default:"resolver:50051" required:"true"`

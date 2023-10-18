@@ -30,8 +30,7 @@ RUN go build \
     "./main.go" && \
     ls -lah
 
-# FROM alpine:3.18.3
-FROM golang:1.21.2-alpine3.18
+FROM alpine:3.18.3
 
 ENV LANG en_US.UTF-8
 ENV TZ UTC

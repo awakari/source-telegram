@@ -3,13 +3,13 @@ module github.com/awakari/source-telegram
 go 1.21
 
 require (
+	github.com/Arman92/go-tdlib v1.0.0
 	github.com/awakari/client-sdk-go v1.0.7
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/cloudevents/sdk-go/binding/format/protobuf/v2 v2.14.0
 	github.com/google/uuid v1.3.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/stretchr/testify v1.8.4
-	github.com/zelenin/go-tdlib v0.7.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	google.golang.org/grpc v1.55.0
 )
