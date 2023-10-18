@@ -7,7 +7,7 @@ import (
 type Config struct {
 	Api struct {
 		Telegram struct {
-			Id       string `envconfig:"API_TELEGRAM_ID" required:"true"`
+			Id       int32  `envconfig:"API_TELEGRAM_ID" required:"true"`
 			Hash     string `envconfig:"API_TELEGRAM_HASH" required:"true"`
 			Password string `envconfig:"API_TELEGRAM_PASS" default:""`
 			Phone    string `envconfig:"API_TELEGRAM_PHONE" required:"true"`

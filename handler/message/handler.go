@@ -3,7 +3,7 @@ package message
 import (
 	"errors"
 	"fmt"
-	"github.com/Arman92/go-tdlib"
+	"github.com/akurilov/go-tdlib/client"
 	"github.com/awakari/client-sdk-go/model"
 	"github.com/awakari/source-telegram/handler"
 	"github.com/cenkalti/backoff/v4"
@@ -14,7 +14,7 @@ import (
 )
 
 type msgHandler struct {
-	clientTg  *tdlib.Client
+	clientTg  *client.Client
 	chats     map[int64]bool
 	writerAwk model.Writer[*pb.CloudEvent]
 	b         *backoff.ExponentialBackOff
@@ -45,7 +45,7 @@ const attrKeyFileType = "tgfiletype"
 
 var errNoAck = errors.New("event was not accepted")
 
-func NewHandler(clientTg *tdlib.Client, chats map[int64]bool, writerAwk model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*tdlib.UpdateNewMessage] {
+func NewHandler(clientTg *client.Client, chats map[int64]bool, writerAwk model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*client.Message] {
 	return msgHandler{
 		clientTg:  clientTg,
 		chats:     chats,
@@ -55,15 +55,15 @@ func NewHandler(clientTg *tdlib.Client, chats map[int64]bool, writerAwk model.Wr
 	}
 }
 
-func (h msgHandler) Handle(msg *tdlib.UpdateNewMessage) (err error) {
-	_, chatOk := h.chats[msg.Message.ChatID]
+func (h msgHandler) Handle(msg *client.Message) (err error) {
+	_, chatOk := h.chats[msg.ChatId]
 	if chatOk {
-		err = h.handleMessage(msg.Message)
+		err = h.handleMessage(msg)
 	}
 	return
 }
 
-func (h msgHandler) handleMessage(msg *tdlib.Message) (err error) {
+func (h msgHandler) handleMessage(msg *client.Message) (err error) {
 	//
 	evt := &pb.CloudEvent{
 		Id:          uuid.NewString(),
@@ -72,7 +72,7 @@ func (h msgHandler) handleMessage(msg *tdlib.Message) (err error) {
 		Attributes: map[string]*pb.CloudEventAttributeValue{
 			attrKeyMsgId: {
 				Attr: &pb.CloudEventAttributeValue_CeString{
-					CeString: strconv.FormatInt(msg.ID, 10),
+					CeString: strconv.FormatInt(msg.Id, 10),
 				},
 			},
 		},
@@ -81,32 +81,32 @@ func (h msgHandler) handleMessage(msg *tdlib.Message) (err error) {
 	err = h.convertSource(msg, evt)
 	//
 	content := msg.Content
-	switch content.GetMessageContentEnum() {
-	case tdlib.MessageAudioType:
-		a := content.(*tdlib.MessageAudio)
+	switch content.MessageContentType() {
+	case client.TypeMessageAudio:
+		a := content.(*client.MessageAudio)
 		convertAudio(a.Audio, evt)
 		convertText(a.Caption, evt)
-	case tdlib.MessageDocumentType:
-		doc := content.(*tdlib.MessageDocument)
+	case client.TypeMessageDocument:
+		doc := content.(*client.MessageDocument)
 		convertDocument(doc.Document, evt)
 		convertText(doc.Caption, evt)
-	case tdlib.MessagePhotoType:
-		img := content.(*tdlib.MessagePhoto)
+	case client.TypeMessagePhoto:
+		img := content.(*client.MessagePhoto)
 		convertImage(img.Photo.Sizes[0], evt)
 		convertText(img.Caption, evt)
-	case tdlib.MessageTextType:
-		txt := content.(*tdlib.MessageText)
+	case client.TypeMessageText:
+		txt := content.(*client.MessageText)
 		convertText(txt.Text, evt)
-	case tdlib.MessageVideoType:
-		v := content.(*tdlib.MessageVideo)
+	case client.TypeMessageVideo:
+		v := content.(*client.MessageVideo)
 		convertVideo(v.Video, evt)
 		convertText(v.Caption, evt)
 	default:
-		h.log.Info(fmt.Sprintf("unsupported message content type: %s\n", content.GetMessageContentEnum()))
+		h.log.Info(fmt.Sprintf("unsupported message content type: %s\n", content.MessageContentType()))
 	}
 	//
 	if evt.Data != nil {
-		h.log.Debug(fmt.Sprintf("New message %d from chat %d: converted to event id: %s, source: %s\n", msg.ID, msg.ChatID, evt.Id, evt.Source))
+		h.log.Debug(fmt.Sprintf("New message %d from chat %d: converted to event id: %s, source: %s\n", msg.Id, msg.ChatId, evt.Id, evt.Source))
 		evts := []*pb.CloudEvent{
 			evt,
 		}
@@ -125,19 +125,22 @@ func (h msgHandler) handleMessage(msg *tdlib.Message) (err error) {
 	return
 }
 
-func (h msgHandler) convertSource(msg *tdlib.Message, evt *pb.CloudEvent) (err error) {
-	var link *tdlib.MessageLink
-	link, err = h.clientTg.GetMessageLink(msg.ChatID, msg.ID, false, false)
+func (h msgHandler) convertSource(msg *client.Message, evt *pb.CloudEvent) (err error) {
+	var link *client.MessageLink
+	link, err = h.clientTg.GetMessageLink(&client.GetMessageLinkRequest{
+		ChatId:    msg.ChatId,
+		MessageId: msg.Id,
+	})
 	switch err {
 	case nil:
 		evt.Source = link.Link
 	default:
-		evt.Source = strconv.FormatInt(msg.ID, 10)
+		evt.Source = strconv.FormatInt(msg.Id, 10)
 	}
 	return
 }
 
-func convertAudio(a *tdlib.Audio, evt *pb.CloudEvent) {
+func convertAudio(a *client.Audio, evt *pb.CloudEvent) {
 	convertFile(a.Audio, evt)
 	evt.Attributes[attrKeyFileType] = &pb.CloudEventAttributeValue{
 		Attr: &pb.CloudEventAttributeValue_CeInteger{
@@ -151,7 +154,7 @@ func convertAudio(a *tdlib.Audio, evt *pb.CloudEvent) {
 	}
 }
 
-func convertDocument(doc *tdlib.Document, evt *pb.CloudEvent) {
+func convertDocument(doc *client.Document, evt *pb.CloudEvent) {
 	convertFile(doc.Document, evt)
 	evt.Attributes[attrKeyFileType] = &pb.CloudEventAttributeValue{
 		Attr: &pb.CloudEventAttributeValue_CeInteger{
@@ -160,7 +163,7 @@ func convertDocument(doc *tdlib.Document, evt *pb.CloudEvent) {
 	}
 }
 
-func convertImage(img tdlib.PhotoSize, evt *pb.CloudEvent) {
+func convertImage(img *client.PhotoSize, evt *pb.CloudEvent) {
 	convertFile(img.Photo, evt)
 	evt.Attributes[attrKeyFileType] = &pb.CloudEventAttributeValue{
 		Attr: &pb.CloudEventAttributeValue_CeInteger{
@@ -179,13 +182,13 @@ func convertImage(img tdlib.PhotoSize, evt *pb.CloudEvent) {
 	}
 }
 
-func convertText(txt *tdlib.FormattedText, evt *pb.CloudEvent) {
+func convertText(txt *client.FormattedText, evt *pb.CloudEvent) {
 	evt.Data = &pb.CloudEvent_TextData{
 		TextData: txt.Text,
 	}
 }
 
-func convertVideo(v *tdlib.Video, evt *pb.CloudEvent) {
+func convertVideo(v *client.Video, evt *pb.CloudEvent) {
 	convertFile(v.Video, evt)
 	evt.Attributes[attrKeyFileType] = &pb.CloudEventAttributeValue{
 		Attr: &pb.CloudEventAttributeValue_CeInteger{
@@ -209,16 +212,16 @@ func convertVideo(v *tdlib.Video, evt *pb.CloudEvent) {
 	}
 }
 
-func convertFile(f *tdlib.File, evt *pb.CloudEvent) {
+func convertFile(f *client.File, evt *pb.CloudEvent) {
 	if f.Remote != nil {
 		evt.Attributes[attrKeyFileId] = &pb.CloudEventAttributeValue{
 			Attr: &pb.CloudEventAttributeValue_CeString{
-				CeString: f.Remote.ID,
+				CeString: f.Remote.Id,
 			},
 		}
 		evt.Attributes[attrKeyFileUniqueId] = &pb.CloudEventAttributeValue{
 			Attr: &pb.CloudEventAttributeValue_CeString{
-				CeString: f.Remote.UniqueID,
+				CeString: f.Remote.UniqueId,
 			},
 		}
 	}

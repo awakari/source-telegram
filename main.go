@@ -3,18 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/Arman92/go-tdlib"
-	"github.com/awakari/client-sdk-go/api"
 	"github.com/awakari/source-telegram/config"
-	"github.com/awakari/source-telegram/handler"
 	"github.com/awakari/source-telegram/handler/message"
-	"github.com/cenkalti/backoff/v4"
+	"github.com/awakari/source-telegram/handler/update"
 	"google.golang.org/grpc/metadata"
 	"log/slog"
-	"math"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"github.com/akurilov/go-tdlib/client"
+	"github.com/awakari/client-sdk-go/api"
+	"github.com/cenkalti/backoff/v4"
 	//_ "net/http/pprof"
 )
 
@@ -32,57 +33,45 @@ func main() {
 	log := slog.New(slog.NewTextHandler(os.Stdout, &opts))
 
 	// init the Telegram client
-	tdLibConfig := tdlib.Config{
-		UseTestDataCenter:  false,
+	authorizer := client.ClientAuthorizer()
+	chCode := make(chan string) // TODO send code via gRPC
+	go client.NonInteractiveCredentialsProvider(authorizer, cfg.Api.Telegram.Phone, cfg.Api.Telegram.Password, chCode)
+	authorizer.TdlibParameters <- &client.SetTdlibParametersRequest{
+		UseTestDc:          false,
 		UseSecretChats:     false,
-		APIID:              cfg.Api.Telegram.Id,
-		APIHash:            cfg.Api.Telegram.Hash,
+		ApiId:              cfg.Api.Telegram.Id,
+		ApiHash:            cfg.Api.Telegram.Hash,
 		SystemLanguageCode: "en",
 		DeviceModel:        "Awakari",
 		SystemVersion:      "1.0.0",
 		ApplicationVersion: "1.0.0",
 	}
-	clientTg := tdlib.NewClient(tdLibConfig)
+	_, err = client.SetLogVerbosityLevel(&client.SetLogVerbosityLevelRequest{
+		NewVerbosityLevel: 1,
+	})
 	if err != nil {
 		panic(err)
 	}
-
-	// Telegram auth
-	for {
-		currentState, _ := clientTg.Authorize()
-		if currentState.GetAuthorizationStateEnum() == tdlib.AuthorizationStateWaitPhoneNumberType {
-			_, err = clientTg.SendPhoneNumber(cfg.Api.Telegram.Phone)
-			if err != nil {
-				log.Error(fmt.Sprintf("Error sending phone number: %s", err))
-			}
-		} else if currentState.GetAuthorizationStateEnum() == tdlib.AuthorizationStateWaitCodeType {
-			fmt.Print("Enter code: ")
-			var code string
-			fmt.Scanln(&code)
-			_, err = clientTg.SendAuthCode(code)
-			if err != nil {
-				log.Error(fmt.Sprintf("Error sending auth code : %v", err))
-			}
-		} else if currentState.GetAuthorizationStateEnum() == tdlib.AuthorizationStateWaitPasswordType {
-			_, err = clientTg.SendAuthPassword(cfg.Api.Telegram.Password)
-			if err != nil {
-				log.Error(fmt.Sprintf("Error sending auth password: %v", err))
-			}
-		} else if currentState.GetAuthorizationStateEnum() == tdlib.AuthorizationStateReadyType {
-			log.Info("Authorization done")
-			break
-		}
-	}
-
 	//
+	clientTg, err := client.NewClient(authorizer)
+	if err != nil {
+		panic(err)
+	}
+	optionValue, err := client.GetOption(&client.GetOptionRequest{
+		Name: "version",
+	})
+	if err != nil {
+		panic(err)
+	}
+	log.Info(fmt.Sprintf("TDLib version: %s", optionValue.(*client.OptionValueString).Value))
 	me, err := clientTg.GetMe()
 	if err != nil {
 		panic(err)
 	}
-	log.Info(fmt.Sprintf("Me: %s %s [%v]", me.FirstName, me.LastName, me.Username))
+	log.Info(fmt.Sprintf("Me: %s %s [%v]", me.FirstName, me.LastName, me.Usernames))
 
 	// get all chats into the cache - get chat by id won't work w/o this
-	_, err = clientTg.GetChats(tdlib.NewChatListMain(), tdlib.JSONInt64(math.MinInt64), math.MinInt64, 0x100)
+	_, err = clientTg.GetChats(&client.GetChatsRequest{Limit: 0x100})
 	if err != nil {
 		panic(err)
 	}
@@ -90,8 +79,10 @@ func main() {
 	// load the configured chats info
 	chats := map[int64]bool{}
 	for _, chatId := range cfg.Api.Telegram.Feed.ChatIds {
-		var chat *tdlib.Chat
-		chat, err = clientTg.GetChat(chatId)
+		var chat *client.Chat
+		chat, err = clientTg.GetChat(&client.GetChatRequest{
+			ChatId: chatId,
+		})
 		if err == nil {
 			log.Info(fmt.Sprintf("Allowed chat id: %d, title: %s", chatId, chat.Title))
 			chats[chatId] = true
@@ -127,35 +118,24 @@ func main() {
 		log.Info("opened the Awakari events writer")
 	}
 
+	// init handlers
+	msgHandler := message.NewHandler(clientTg, chats, w, log)
+
 	// expose the profiling
 	//go func() {
 	//	_ = http.ListenAndServe("localhost:6060", nil)
 	//}()
 
-	// init handlers
-	msgHandler := message.NewHandler(clientTg, chats, w, log)
-	b := backoff.NewExponentialBackOff()
-	h := handler.ChatFilterHandler{
-		Client:     clientTg,
-		Chats:      chats,
-		MsgHandler: msgHandler,
-		QueueSize:  0x100,
-		BackOff:    b,
-	}
-
 	//
-	go func() {
-		err = h.Run()
-		if err != nil {
-			panic(err)
-		}
-	}()
-	updates := clientTg.GetRawUpdatesChannel(0x100)
-	defer close(updates)
-	for update := range updates {
-		// Show all updates
-		fmt.Println(update.Data)
-		fmt.Print("\n\n")
+	listener := clientTg.GetListener()
+	defer listener.Close()
+	h := update.NewHandler(listener, msgHandler)
+	b := backoff.NewExponentialBackOff()
+	err = backoff.RetryNotify(h.Listen, b, func(err error, d time.Duration) {
+		log.Warn(fmt.Sprintf("Failed to handle an update, cause: %s, retrying in: %s...", err, d))
+	})
+	if err != nil {
+		panic(err)
 	}
 
 	//
@@ -163,7 +143,7 @@ func main() {
 	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-ch
-		clientTg.DestroyInstance()
+		clientTg.Stop()
 		os.Exit(1)
 	}()
 }

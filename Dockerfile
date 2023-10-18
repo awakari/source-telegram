@@ -26,7 +26,7 @@ RUN go build \
     -a \
     -trimpath \
     -ldflags "-s -w" \
-    -o app \
+    -o source-telegram \
     "./main.go" && \
     ls -lah
 
@@ -40,11 +40,6 @@ RUN apk upgrade --no-cache && \
             ca-certificates \
             libstdc++
 
-WORKDIR /app
-
-COPY --from=go-builder /src/app .
-RUN apk upgrade --no-cache && \
-    apk add --no-cache \
-        screen
-
-CMD ["sleep", "infinity"]
+COPY --from=go-builder /src/source-telegram /bin/source-telegram
+COPY --from=go-builder /src/scripts/run.sh /bin/run.sh
+CMD ["/bin/run.sh"]

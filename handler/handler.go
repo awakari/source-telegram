@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"github.com/Arman92/go-tdlib"
+	"github.com/akurilov/go-tdlib/client"
 )
 
-type Handler[U tdlib.Update] interface {
+type Handler[U client.Type] interface {
 	Handle(u U) (err error)
 }

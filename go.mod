@@ -3,7 +3,7 @@ module github.com/awakari/source-telegram
 go 1.21
 
 require (
-	github.com/Arman92/go-tdlib v1.0.0
+	github.com/akurilov/go-tdlib v0.0.1
 	github.com/awakari/client-sdk-go v1.0.7
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/cloudevents/sdk-go/binding/format/protobuf/v2 v2.14.0
