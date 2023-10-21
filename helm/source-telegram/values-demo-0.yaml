@@ -1,6 +1,8 @@
 api:
   telegram:
     feed:
+      # demo instance's source public channels
+      # modify the list below and submit a PR to add a new one
       chatIds:
         - "-1001801930101" # Хельсинки события
         - "-1001024068640" # AstroAlert | Наблюдательная астрономия
