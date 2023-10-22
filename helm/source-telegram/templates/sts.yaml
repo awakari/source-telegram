@@ -49,6 +49,30 @@ spec:
               value: "{{ join "," .Values.api.telegram.feed.chatIds }}"
             - name: API_WRITER_URI
               value: "{{ .Values.api.writer.uri }}"
+            - name: DB_URI
+              value: "{{ .Values.db.protocol }}://{{ .Values.db.hostname }}/?retryWrites=true&w=majority"
+            - name: DB_NAME
+              value: {{ .Values.db.name }}
+            - name: DB_USERNAME
+              value: {{ .Values.db.username }}
+            {{- if .Values.db.password.secret.enabled }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.db.password.secret.name }}"
+                  key: "{{ .Values.db.password.secret.key }}"
+            {{- else }}
+            - name: DB_PASSWORD
+              value: "{{ .Values.db.password.raw }}"
+            {{- end }}
+            - name: DB_TABLE_NAME
+              value: {{ .Values.db.table.name }}
+            - name: DB_TABLE_SHARD
+              value: "{{ .Values.db.table.shard }}"
+            - name: DB_TLS_ENABLED
+              value: "{{ .Values.db.tls.enabled }}"
+            - name: DB_TLS_INSECURE
+              value: "{{ .Values.db.tls.insecure }}"
             - name: LOG_LEVEL
               value: "{{ .Values.log.level }}"
             - name: REPLICA_RANGE

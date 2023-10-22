@@ -75,6 +75,25 @@ api:
   telegram:
     feed:
       chatIds: []
+db:
+  protocol: mongodb
+  hostname: "mongodb:27017"
+  # Database name to use.
+  name: source
+  username: ""
+  password:
+    raw: "" # used if db.password.secret.enabled is false
+    secret:
+      enabled: false
+      name: "mongodb"
+      key: "mongodb-root-password"
+  table:
+    # Database table name to use.
+    name: tgchans
+    shard: true
+  tls:
+    enabled: false
+    insecure: false
 log:
   # https://pkg.go.dev/golang.org/x/exp/slog#Level
   level: -4

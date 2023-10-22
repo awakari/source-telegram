@@ -54,7 +54,6 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("Input line from pipe: %s\n", line)
 		chCode <- line
 	}()
 	//
