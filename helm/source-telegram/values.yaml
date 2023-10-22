@@ -38,7 +38,7 @@ securityContext: {}
 service:
   type: ClusterIP
   port: 8080
-  protGrpc: 50051
+  portGrpc: 50051
 
 ingress:
   enabled: false
