@@ -113,7 +113,7 @@ spec:
                   - key: app.kubernetes.io/name
                     operator: In
                     values:
-                      - {{ .Values.fullnameOverride }}
+                      - {{ include "source-telegram.name" . }}
               topologyKey: "kubernetes.io/hostname"
       {{- with .Values.tolerations }}
       tolerations:

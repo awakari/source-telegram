@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	modelAwk "github.com/awakari/client-sdk-go/model"
+	apiGrpc "github.com/awakari/source-telegram/api/grpc"
 	"github.com/awakari/source-telegram/config"
 	"github.com/awakari/source-telegram/handler/message"
 	"github.com/awakari/source-telegram/handler/update"
@@ -190,6 +191,11 @@ func main() {
 	//go func() {
 	//	_ = http.ListenAndServe("localhost:6060", nil)
 	//}()
+
+	log.Info(fmt.Sprintf("starting to listen the API @ port #%d...", cfg.Api.Port))
+	if err = apiGrpc.Serve(stor, cfg.Api.Port); err != nil {
+		panic(err)
+	}
 
 	//
 	listener := clientTg.GetListener()
