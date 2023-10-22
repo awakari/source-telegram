@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"github.com/awakari/source-telegram/model"
-	"math"
 )
 
 type storageMock struct {
@@ -17,17 +16,23 @@ func (s storageMock) Close() error {
 	return nil
 }
 
-func (s storageMock) Exists(ctx context.Context, id int64) (exists bool, err error) {
+func (s storageMock) Update(ctx context.Context, ch model.Channel) (err error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (s storageMock) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor int64) (page []int64, err error) {
+func (s storageMock) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error) {
 	switch cursor {
-	case math.MinInt64:
-		page = []int64{
-			-1001801930101,
-			-1001754252633,
+	case "":
+		page = []model.Channel{
+			{
+				Id:   -1001801930101,
+				Name: "channel0",
+			},
+			{
+				Id:   -1001754252633,
+				Name: "channel1",
+			},
 		}
 	}
 	return

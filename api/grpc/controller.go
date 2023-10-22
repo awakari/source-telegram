@@ -22,7 +22,16 @@ func NewController(stor storage.Storage) ServiceServer {
 func (c controller) List(ctx context.Context, req *ListRequest) (resp *ListResponse, err error) {
 	filterNone := model.ChannelFilter{}
 	resp = &ListResponse{}
-	resp.Page, err = c.stor.GetPage(ctx, filterNone, req.Limit, req.Cursor)
+	var page []model.Channel
+	page, err = c.stor.GetPage(ctx, filterNone, req.Limit, req.Cursor)
+	if len(page) > 0 {
+		for _, ch := range page {
+			resp.Page = append(resp.Page, &Channel{
+				Id:   ch.Id,
+				Name: ch.Name,
+			})
+		}
+	}
 	err = encodeError(err)
 	return
 }

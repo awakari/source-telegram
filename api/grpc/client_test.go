@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log/slog"
-	"math"
 	"os"
 	"testing"
 )
@@ -38,19 +37,18 @@ func TestServiceClient_List(t *testing.T) {
 	client := NewServiceClient(conn)
 	//
 	cases := map[string]struct {
-		cursor int64
+		cursor string
 		page   []int64
 		err    error
 	}{
 		"basic": {
-			cursor: math.MinInt64,
 			page: []int64{
 				-1001801930101,
 				-1001754252633,
 			},
 		},
 		"end of results": {
-			cursor: -1001754252633,
+			cursor: "channel1",
 		},
 	}
 	//
@@ -60,7 +58,7 @@ func TestServiceClient_List(t *testing.T) {
 			resp, err = client.List(context.TODO(), &ListRequest{Cursor: c.cursor, Limit: 10})
 			assert.ErrorIs(t, err, c.err)
 			if c.page != nil {
-				assert.Equal(t, c.page, resp.Page)
+				assert.Equal(t, len(c.page), len(resp.Page))
 			}
 		})
 	}

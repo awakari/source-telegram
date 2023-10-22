@@ -9,8 +9,8 @@ import (
 
 type Storage interface {
 	io.Closer
-	Exists(ctx context.Context, id int64) (exists bool, err error)
-	GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor int64) (page []int64, err error)
+	Update(ctx context.Context, ch model.Channel) (err error)
+	GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error)
 }
 
 var ErrNotFound = errors.New("channel not found")

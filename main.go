@@ -14,7 +14,6 @@ import (
 	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
 	"google.golang.org/grpc/metadata"
 	"log/slog"
-	"math"
 	"os"
 	"os/signal"
 	"strconv"
@@ -145,36 +144,43 @@ func main() {
 		IdDiv: cfg.Replica.Range,
 		IdRem: replicaIndex,
 	}
-	chanCursor := int64(math.MinInt64)
+	var chanCursor string
 	for {
-		var chatIds []int64
-		chatIds, err = stor.GetPage(context.TODO(), chanFilter, 0x100, chanCursor)
+		var chans []model.Channel
+		chans, err = stor.GetPage(context.TODO(), chanFilter, 0x100, chanCursor)
 		if err != nil {
 			panic(err)
 		}
-		if len(chatIds) == 0 {
+		if len(chans) == 0 {
 			break
 		}
-		chanCursor = chatIds[len(chatIds)-1]
-		for _, chatId := range chatIds {
+		chanCursor = chans[len(chans)-1].Name
+		for _, ch := range chans {
 			var chat *client.Chat
 			chat, err = clientTg.GetChat(&client.GetChatRequest{
-				ChatId: chatId,
+				ChatId: ch.Id,
 			})
 			switch err {
 			case nil:
-				log.Debug(fmt.Sprintf("Selected chat id: %d, title: %s", chatId, chat.Title))
+				if ch.Name != chat.Title {
+					ch.Name = chat.Title
+					err = stor.Update(context.TODO(), ch)
+					if err != nil {
+						log.Error(fmt.Sprintf("Failed to update chat %+v title in DB", ch))
+					}
+				}
+				log.Debug(fmt.Sprintf("Selected chat id: %d, title: %s", ch.Id, chat.Title))
 				var w modelAwk.Writer[*pb.CloudEvent]
-				userId := strconv.FormatInt(chatId, 10)
+				userId := strconv.FormatInt(ch.Id, 10)
 				w, err = clientAwk.OpenMessagesWriter(ctxGroupId, userId)
 				switch err {
 				case nil:
-					chatWriters[chatId] = w
+					chatWriters[ch.Id] = w
 				default:
-					log.Error(fmt.Sprintf("Failed to open a writer for the chat id: %d, cause: %s", chatId, err))
+					log.Error(fmt.Sprintf("Failed to open a writer for the chat id: %d, cause: %s", ch.Id, err))
 				}
 			default:
-				log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", chatId, err))
+				log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", ch.Id, err))
 			}
 		}
 	}

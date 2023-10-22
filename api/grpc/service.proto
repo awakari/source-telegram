@@ -10,9 +10,14 @@ service Service {
 
 message ListRequest {
   uint32 limit = 1;
-  int64 cursor = 2;
+  string cursor = 2;
 }
 
 message ListResponse {
-  repeated int64 page = 1;
+  repeated Channel page = 1;
+}
+
+message Channel {
+  int64 id = 1;
+  string name = 2;
 }

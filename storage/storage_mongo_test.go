@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
-	"math"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -41,7 +41,7 @@ func clear(ctx context.Context, t *testing.T, s storageMongo) {
 	require.Nil(t, s.Close())
 }
 
-func TestStorageMongo_Exists(t *testing.T) {
+func TestStorageMongo_Update(t *testing.T) {
 	//
 	collName := fmt.Sprintf("feeds-test-%d", time.Now().UnixMicro())
 	dbCfg := config.DbConfig{
@@ -65,13 +65,16 @@ func TestStorageMongo_Exists(t *testing.T) {
 	})
 	require.Nil(t, err)
 	//
-	var exists bool
-	exists, err = s.Exists(ctx, -1001801930101)
-	assert.True(t, exists)
+	err = s.Update(ctx, model.Channel{
+		Id:   -1001801930101,
+		Name: "channel0",
+	})
 	assert.Nil(t, err)
-	exists, err = s.Exists(ctx, -1001024068640)
-	assert.False(t, exists)
-	assert.Nil(t, err)
+	err = s.Update(ctx, model.Channel{
+		Id:   -1001024068640,
+		Name: "channel1",
+	})
+	assert.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestStorageMongo_GetPage(t *testing.T) {
@@ -94,15 +97,16 @@ func TestStorageMongo_GetPage(t *testing.T) {
 	defer clear(ctx, t, s.(storageMongo))
 	//
 	ids := []int64{
-		-1001801930101,
-		-1001754252633,
-		-1001385274097,
-		-1001024068640,
 		-1001004621278,
+		-1001024068640,
+		-1001385274097,
+		-1001754252633,
+		-1001801930101,
 	}
 	for _, id := range ids {
 		_, err = sm.coll.InsertOne(ctx, bson.M{
-			attrId: id,
+			attrId:   id,
+			attrName: strconv.FormatInt(id, 10),
 		})
 		require.Nil(t, err)
 	}
@@ -110,31 +114,28 @@ func TestStorageMongo_GetPage(t *testing.T) {
 	cases := map[string]struct {
 		filter model.ChannelFilter
 		limit  uint32
-		cursor int64
+		cursor string
 		page   []int64
 		err    error
 	}{
 		"basic": {
-			limit:  10,
-			cursor: math.MinInt64,
-			page:   ids,
+			limit: 10,
+			page:  ids,
 		},
 		"filter": {
 			filter: model.ChannelFilter{
 				IdDiv: 2,
 				IdRem: 1,
 			},
-			limit:  10,
-			cursor: math.MinInt64,
+			limit: 10,
 			page: []int64{
-				ids[0],
-				ids[1],
 				ids[2],
+				ids[3],
+				ids[4],
 			},
 		},
 		"limit": {
-			limit:  2,
-			cursor: math.MinInt64,
+			limit: 2,
 			page: []int64{
 				ids[0],
 				ids[1],
@@ -142,7 +143,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 		},
 		"cursor": {
 			limit:  10,
-			cursor: ids[1],
+			cursor: strconv.FormatInt(ids[1], 10),
 			page: []int64{
 				ids[2],
 				ids[3],
@@ -151,15 +152,19 @@ func TestStorageMongo_GetPage(t *testing.T) {
 		},
 		"end of results": {
 			limit:  10,
-			cursor: ids[4],
+			cursor: strconv.FormatInt(ids[4], 10),
 		},
 	}
 	//
 	for k, c := range cases {
 		t.Run(k, func(t *testing.T) {
-			var page []int64
+			var page []model.Channel
 			page, err = s.GetPage(ctx, c.filter, c.limit, c.cursor)
-			assert.Equal(t, c.page, page)
+			assert.Equal(t, len(c.page), len(page))
+			for i, ch := range page {
+				assert.Equal(t, c.page[i], ch.Id)
+				assert.Equal(t, strconv.FormatInt(c.page[i], 10), ch.Name)
+			}
 			assert.ErrorIs(t, err, c.err)
 		})
 	}

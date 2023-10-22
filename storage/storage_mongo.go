@@ -13,10 +13,12 @@ import (
 )
 
 type recChan struct {
-	Id int64 `bson:"id"`
+	Id   int64  `bson:"id"`
+	Name string `bson:"name"`
 }
 
 const attrId = "id"
+const attrName = "name"
 
 type storageMongo struct {
 	conn *mongo.Client
@@ -33,10 +35,14 @@ var projGetBatch = bson.D{
 		Key:   attrId,
 		Value: 1,
 	},
+	{
+		Key:   attrName,
+		Value: 1,
+	},
 }
 var sortGetBatch = bson.D{
 	{
-		Key:   attrId,
+		Key:   attrName,
 		Value: 1,
 	},
 }
@@ -45,6 +51,17 @@ var indices = []mongo.IndexModel{
 		Keys: bson.D{
 			{
 				Key:   attrId,
+				Value: 1,
+			},
+		},
+		Options: options.
+			Index().
+			SetUnique(true),
+	},
+	{
+		Keys: bson.D{
+			{
+				Key:   attrName,
 				Value: 1,
 			},
 		},
@@ -94,30 +111,40 @@ func (sm storageMongo) Close() error {
 	return sm.conn.Disconnect(context.TODO())
 }
 
-func (sm storageMongo) Exists(ctx context.Context, id int64) (exists bool, err error) {
-	result := sm.coll.FindOne(ctx, bson.M{attrId: id}, optsGet)
-	err = result.Err()
-	switch {
-	case err == nil:
-		exists = true
-	case errors.Is(err, mongo.ErrNoDocuments):
-		err = nil
+func (sm storageMongo) Update(ctx context.Context, ch model.Channel) (err error) {
+	q := bson.M{
+		attrId: ch.Id,
+	}
+	u := bson.M{
+		"$set": bson.M{
+			attrName: ch.Name,
+		},
+	}
+	var result *mongo.UpdateResult
+	result, err = sm.coll.UpdateOne(ctx, q, u)
+	switch err {
+	case nil:
+		if result.MatchedCount < 1 {
+			err = fmt.Errorf("%w: %d", ErrNotFound, ch.Id)
+		}
 	default:
-		err = decodeError(err, id)
+		err = decodeError(err, ch.Id)
 	}
 	return
 }
 
-func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor int64) (page []int64, err error) {
+func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error) {
 	q := bson.M{
-		attrId: bson.M{
+		attrName: bson.M{
 			"$gt": cursor,
 		},
 	}
 	if filter.IdDiv != 0 {
-		q[attrId].(bson.M)["$mod"] = bson.A{
-			filter.IdDiv,
-			-int32(filter.IdRem),
+		q[attrId] = bson.M{
+			"$mod": bson.A{
+				filter.IdDiv,
+				-int32(filter.IdRem),
+			},
 		}
 	}
 	optsList := options.
@@ -133,7 +160,10 @@ func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, 
 		for cur.Next(ctx) {
 			err = errors.Join(err, cur.Decode(&rec))
 			if err == nil {
-				page = append(page, rec.Id)
+				page = append(page, model.Channel{
+					Id:   rec.Id,
+					Name: rec.Name,
+				})
 			}
 		}
 	}
