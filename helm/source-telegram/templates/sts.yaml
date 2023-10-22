@@ -47,8 +47,6 @@ spec:
                 secretKeyRef:
                   name: "{{ include "source-telegram.fullname" . }}-tokens"
                   key: phone
-            - name: API_TELEGRAM_FEED_CHAT_IDS
-              value: "{{ join "," .Values.api.telegram.feed.chatIds }}"
             - name: API_WRITER_URI
               value: "{{ .Values.api.writer.uri }}"
             - name: DB_URI
