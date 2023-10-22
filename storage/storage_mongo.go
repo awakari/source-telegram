@@ -67,7 +67,7 @@ var indices = []mongo.IndexModel{
 		},
 		Options: options.
 			Index().
-			SetUnique(true),
+			SetUnique(false),
 	},
 }
 
