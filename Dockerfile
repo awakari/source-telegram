@@ -15,6 +15,8 @@ RUN set -eux && \
         linux-headers \
         make \
         openssl-dev \
+        protobuf-dev \
+        protoc \
         zlib-dev
 
 WORKDIR /src
