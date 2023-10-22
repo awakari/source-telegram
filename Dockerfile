@@ -13,6 +13,7 @@ RUN set -eux && \
         curl \
         git \
         linux-headers \
+        make \
         openssl-dev \
         zlib-dev
 
@@ -22,7 +23,7 @@ COPY --from=ghcr.io/awakari/tdlib:latest /usr/local/include/td /usr/local/includ
 COPY --from=ghcr.io/awakari/tdlib:latest /usr/local/lib/libtd* /usr/local/lib/
 COPY . /src
 
-RUN go build \
+RUN make proto && go build \
     -a \
     -trimpath \
     -ldflags "-s -w" \
