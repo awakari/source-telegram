@@ -11,5 +11,9 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: {{ .Values.service.protGrpc }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
   selector:
     {{- include "source-telegram.selectorLabels" . | nindent 4 }}

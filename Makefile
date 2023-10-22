@@ -9,7 +9,13 @@ docker-tdlib:
 	docker build -f tdlib.Dockerfile -t ghcr.io/awakari/tdlib:latest .
 	docker push ghcr.io/awakari/tdlib:latest
 
-vet:
+proto:
+	go install github.com/golang/protobuf/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
+	PATH=${PATH}:~/go/bin protoc --go_out=plugins=grpc:. --go_opt=paths=source_relative \
+		api/grpc/*.proto
+
+vet: proto
 	go vet
 
 test: vet
@@ -20,7 +26,7 @@ test: vet
 	./scripts/cover.sh
 	rm -f ${COVERAGE_TMP_FILE_NAME}
 
-build:
+build: proto
 	CGO_ENABLED=0 GOOS=linux GOARCH= GOARM= go build -ldflags="-s -w" -o ${BINARY_FILE_NAME} main.go
 	chmod ugo+x ${BINARY_FILE_NAME}
 

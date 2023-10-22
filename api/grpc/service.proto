@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package awakari.source.telegram;
+
+option go_package = "./api/grpc";
+
+service Service {
+  rpc List(ListRequest) returns (ListResponse);
+}
+
+message ListRequest {
+  uint32 limit = 1;
+  int64 cursor = 2;
+}
+
+message ListResponse {
+  repeated int64 page = 1;
+}

@@ -38,6 +38,7 @@ securityContext: {}
 service:
   type: ClusterIP
   port: 8080
+  protGrpc: 50051
 
 ingress:
   enabled: false
@@ -72,9 +73,6 @@ affinity: {}
 api:
   writer:
     uri: "resolver:50051"
-  telegram:
-    feed:
-      chatIds: []
 db:
   protocol: mongodb
   hostname: "mongodb:27017"

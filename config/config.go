@@ -6,12 +6,12 @@ import (
 
 type Config struct {
 	Api struct {
+		Port     uint16 `envconfig:"API_PORT" default:"50051" required:"true"`
 		Telegram struct {
 			Id       int32  `envconfig:"API_TELEGRAM_ID" required:"true"`
 			Hash     string `envconfig:"API_TELEGRAM_HASH" required:"true"`
 			Password string `envconfig:"API_TELEGRAM_PASS" default:""`
 			Phone    string `envconfig:"API_TELEGRAM_PHONE" required:"true"`
-			Feed     FeedConfig
 		}
 		Writer struct {
 			Uri string `envconfig:"API_WRITER_URI" default:"resolver:50051" required:"true"`
@@ -22,10 +22,6 @@ type Config struct {
 		Level int `envconfig:"LOG_LEVEL" default:"-4" required:"true"`
 	}
 	Replica ReplicaConfig
-}
-
-type FeedConfig struct {
-	ChatIds []int64 `envconfig:"API_TELEGRAM_FEED_CHAT_IDS" required:"true"`
 }
 
 type DbConfig struct {

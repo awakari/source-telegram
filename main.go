@@ -166,35 +166,14 @@ func main() {
 				var w modelAwk.Writer[*pb.CloudEvent]
 				userId := strconv.FormatInt(chatId, 10)
 				w, err = clientAwk.OpenMessagesWriter(ctxGroupId, userId)
-				if err == nil {
-					chatWriters[chatId] = w
-				}
-			default:
-				log.Warn(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", chatId, err))
-				_, err = clientTg.JoinChat(&client.JoinChatRequest{
-					ChatId: chatId,
-				})
 				switch err {
 				case nil:
-					log.Debug(fmt.Sprintf("Joined to a new chat, id: %d", chatId))
-					chat, err = clientTg.GetChat(&client.GetChatRequest{
-						ChatId: chatId,
-					})
-					switch err {
-					case nil:
-						log.Debug(fmt.Sprintf("Selected chat id: %d, title: %s", chatId, chat.Title))
-						var w modelAwk.Writer[*pb.CloudEvent]
-						userId := strconv.FormatInt(chatId, 10)
-						w, err = clientAwk.OpenMessagesWriter(ctxGroupId, userId)
-						if err == nil {
-							chatWriters[chatId] = w
-						}
-					default:
-						log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", chatId, err))
-					}
+					chatWriters[chatId] = w
 				default:
-					log.Warn(fmt.Sprintf("Failed to join the chat by id: %d, cause: %s", chatId, err))
+					log.Error(fmt.Sprintf("Failed to open a writer for the chat id: %d, cause: %s", chatId, err))
 				}
+			default:
+				log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", chatId, err))
 			}
 		}
 	}
