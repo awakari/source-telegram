@@ -154,6 +154,7 @@ func main() {
 		if len(chatIds) == 0 {
 			break
 		}
+		chanCursor = chatIds[len(chatIds)-1]
 		for _, chatId := range chatIds {
 			var chat *client.Chat
 			chat, err = clientTg.GetChat(&client.GetChatRequest{
