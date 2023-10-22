@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	modelAwk "github.com/awakari/client-sdk-go/model"
 	"github.com/awakari/source-telegram/config"
 	"github.com/awakari/source-telegram/handler/message"
 	"github.com/awakari/source-telegram/handler/update"
 	"github.com/awakari/source-telegram/model"
 	"github.com/awakari/source-telegram/storage"
+	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
 	"google.golang.org/grpc/metadata"
 	"log/slog"
 	"math"
@@ -106,6 +108,23 @@ func main() {
 	}
 	defer stor.Close()
 
+	// init the Awakari writer
+	var clientAwk api.Client
+	clientAwk, err = api.
+		NewClientBuilder().
+		WriterUri(cfg.Api.Writer.Uri).
+		Build()
+	if err != nil {
+		panic(fmt.Sprintf("failed to initialize the Awakari API client: %s", err))
+	}
+	log.Info("initialized the Awakari API client")
+	defer clientAwk.Close()
+	ctxGroupId := metadata.AppendToOutgoingContext(
+		context.TODO(),
+		"x-awakari-group-id",
+		"com.github.awakari.source-telegram",
+	)
+
 	// determine the replica index
 	replicaNameParts := strings.Split(cfg.Replica.Name, "-")
 	if len(replicaNameParts) < 2 {
@@ -120,7 +139,7 @@ func main() {
 	log.Info(fmt.Sprintf("Replica: %d/%d", replicaIndex, cfg.Replica.Range))
 
 	// load the configured chats info
-	chats := map[int64]bool{}
+	chatWriters := map[int64]modelAwk.Writer[*pb.CloudEvent]{}
 	chanFilter := model.ChannelFilter{
 		IdDiv: cfg.Replica.Range,
 		IdRem: replicaIndex,
@@ -143,7 +162,12 @@ func main() {
 			switch err {
 			case nil:
 				log.Debug(fmt.Sprintf("Selected chat id: %d, title: %s", chatId, chat.Title))
-				chats[chatId] = true
+				var w modelAwk.Writer[*pb.CloudEvent]
+				userId := strconv.FormatInt(chatId, 10)
+				w, err = clientAwk.OpenMessagesWriter(ctxGroupId, userId)
+				if err == nil {
+					chatWriters[chatId] = w
+				}
 			default:
 				log.Warn(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", chatId, err))
 				_, err = clientTg.JoinChat(&client.JoinChatRequest{
@@ -158,7 +182,12 @@ func main() {
 					switch err {
 					case nil:
 						log.Debug(fmt.Sprintf("Selected chat id: %d, title: %s", chatId, chat.Title))
-						chats[chatId] = true
+						var w modelAwk.Writer[*pb.CloudEvent]
+						userId := strconv.FormatInt(chatId, 10)
+						w, err = clientAwk.OpenMessagesWriter(ctxGroupId, userId)
+						if err == nil {
+							chatWriters[chatId] = w
+						}
 					default:
 						log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", chatId, err))
 					}
@@ -168,35 +197,14 @@ func main() {
 			}
 		}
 	}
-
-	// init the Awakari writer
-	var clientAwk api.Client
-	clientAwk, err = api.
-		NewClientBuilder().
-		WriterUri(cfg.Api.Writer.Uri).
-		Build()
-	if err != nil {
-		panic(fmt.Sprintf("failed to initialize the Awakari API client: %s", err))
-	}
-	log.Info("initialized the Awakari API client")
-	defer clientAwk.Close()
-	//
-	groupIdCtx := metadata.AppendToOutgoingContext(
-		context.TODO(),
-		"x-awakari-group-id", "source-telegram",
-		"x-awakari-user-id", "source-telegram",
-	)
-	w, err := clientAwk.OpenMessagesWriter(groupIdCtx, "source-telegram")
-	if err != nil {
-		panic(fmt.Sprintf("failed to open the Awakari events writer: %s", err))
-	}
-	if err == nil {
-		defer w.Close()
-		log.Info("opened the Awakari events writer")
-	}
+	defer func() {
+		for _, w := range chatWriters {
+			_ = w.Close()
+		}
+	}()
 
 	// init handlers
-	msgHandler := message.NewHandler(clientTg, chats, w, log)
+	msgHandler := message.NewHandler(clientTg, chatWriters, log)
 
 	// expose the profiling
 	//go func() {

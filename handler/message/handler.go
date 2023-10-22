@@ -14,11 +14,10 @@ import (
 )
 
 type msgHandler struct {
-	clientTg  *client.Client
-	chats     map[int64]bool
-	writerAwk model.Writer[*pb.CloudEvent]
-	b         *backoff.ExponentialBackOff
-	log       *slog.Logger
+	clientTg    *client.Client
+	chatWriters map[int64]model.Writer[*pb.CloudEvent]
+	b           *backoff.ExponentialBackOff
+	log         *slog.Logger
 }
 
 type FileType int32
@@ -45,25 +44,25 @@ const attrKeyFileType = "tgfiletype"
 
 var errNoAck = errors.New("event was not accepted")
 
-func NewHandler(clientTg *client.Client, chats map[int64]bool, writerAwk model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*client.Message] {
+func NewHandler(clientTg *client.Client, chatWriters map[int64]model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*client.Message] {
 	return msgHandler{
-		clientTg:  clientTg,
-		chats:     chats,
-		writerAwk: writerAwk,
-		b:         backoff.NewExponentialBackOff(),
-		log:       log,
+		clientTg:    clientTg,
+		chatWriters: chatWriters,
+		b:           backoff.NewExponentialBackOff(),
+		log:         log,
 	}
 }
 
 func (h msgHandler) Handle(msg *client.Message) (err error) {
-	_, chatOk := h.chats[msg.ChatId]
+	var w model.Writer[*pb.CloudEvent]
+	w, chatOk := h.chatWriters[msg.ChatId]
 	if chatOk {
-		err = h.handleMessage(msg)
+		err = h.handleMessage(w, msg)
 	}
 	return
 }
 
-func (h msgHandler) handleMessage(msg *client.Message) (err error) {
+func (h msgHandler) handleMessage(w model.Writer[*pb.CloudEvent], msg *client.Message) (err error) {
 	//
 	evt := &pb.CloudEvent{
 		Id:          uuid.NewString(),
@@ -113,7 +112,7 @@ func (h msgHandler) handleMessage(msg *client.Message) (err error) {
 		err = backoff.Retry(
 			func() (err error) {
 				var ackCount uint32
-				ackCount, err = h.writerAwk.WriteBatch(evts)
+				ackCount, err = w.WriteBatch(evts)
 				if err == nil && ackCount < 1 {
 					err = errNoAck
 				}
