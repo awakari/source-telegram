@@ -7,10 +7,15 @@ import (
 	"github.com/awakari/source-telegram/config"
 	"github.com/awakari/source-telegram/handler/message"
 	"github.com/awakari/source-telegram/handler/update"
+	"github.com/awakari/source-telegram/model"
+	"github.com/awakari/source-telegram/storage"
 	"google.golang.org/grpc/metadata"
 	"log/slog"
+	"math"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -89,24 +94,79 @@ func main() {
 	log.Info(fmt.Sprintf("Me: %s %s [%v]", me.FirstName, me.LastName, me.Usernames))
 
 	// get all chats into the cache - get chat by id won't work w/o this
-	_, err = clientTg.GetChats(&client.GetChatsRequest{Limit: 0x100})
+	_, err = clientTg.GetChats(&client.GetChatsRequest{Limit: 1000})
 	if err != nil {
 		panic(err)
 	}
 
+	// init the channel storage
+	var stor storage.Storage
+	stor, err = storage.NewStorage(context.TODO(), cfg.Db)
+	if err != nil {
+		panic(err)
+	}
+	defer stor.Close()
+
+	// determine the replica index
+	replicaNameParts := strings.Split(cfg.Replica.Name, "-")
+	if len(replicaNameParts) < 2 {
+		panic("unable to parse the replica name: " + cfg.Replica.Name)
+	}
+	var replicaIndexTmp uint64
+	replicaIndexTmp, err = strconv.ParseUint(replicaNameParts[len(replicaNameParts)-1], 10, 16)
+	if err != nil {
+		panic(err)
+	}
+	replicaIndex := uint32(replicaIndexTmp)
+	log.Info(fmt.Sprintf("Replica: %d/%d", replicaIndex, cfg.Replica.Range))
+
 	// load the configured chats info
 	chats := map[int64]bool{}
-	for _, chatId := range cfg.Api.Telegram.Feed.ChatIds {
-		var chat *client.Chat
-		chat, err = clientTg.GetChat(&client.GetChatRequest{
-			ChatId: chatId,
-		})
-		if err == nil {
-			log.Info(fmt.Sprintf("Allowed chat id: %d, title: %s", chatId, chat.Title))
-			chats[chatId] = true
-		}
+	chanFilter := model.ChannelFilter{
+		IdDiv: cfg.Replica.Range,
+		IdRem: replicaIndex,
+	}
+	chanCursor := int64(math.MinInt64)
+	for {
+		var chatIds []int64
+		chatIds, err = stor.GetPage(context.TODO(), chanFilter, 0x100, chanCursor)
 		if err != nil {
-			log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", chatId, err))
+			panic(err)
+		}
+		if len(chatIds) == 0 {
+			break
+		}
+		for _, chatId := range chatIds {
+			var chat *client.Chat
+			chat, err = clientTg.GetChat(&client.GetChatRequest{
+				ChatId: chatId,
+			})
+			switch err {
+			case nil:
+				log.Debug(fmt.Sprintf("Selected chat id: %d, title: %s", chatId, chat.Title))
+				chats[chatId] = true
+			default:
+				log.Warn(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", chatId, err))
+				_, err = clientTg.JoinChat(&client.JoinChatRequest{
+					ChatId: chatId,
+				})
+				switch err {
+				case nil:
+					log.Debug(fmt.Sprintf("Joined to a new chat, id: %d", chatId))
+					chat, err = clientTg.GetChat(&client.GetChatRequest{
+						ChatId: chatId,
+					})
+					switch err {
+					case nil:
+						log.Debug(fmt.Sprintf("Selected chat id: %d, title: %s", chatId, chat.Title))
+						chats[chatId] = true
+					default:
+						log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", chatId, err))
+					}
+				default:
+					log.Warn(fmt.Sprintf("Failed to join the chat by id: %d, cause: %s", chatId, err))
+				}
+			}
 		}
 	}
 

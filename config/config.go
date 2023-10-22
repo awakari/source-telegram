@@ -17,13 +17,35 @@ type Config struct {
 			Uri string `envconfig:"API_WRITER_URI" default:"resolver:50051" required:"true"`
 		}
 	}
+	Db  DbConfig
 	Log struct {
 		Level int `envconfig:"LOG_LEVEL" default:"-4" required:"true"`
 	}
+	Replica ReplicaConfig
 }
 
 type FeedConfig struct {
 	ChatIds []int64 `envconfig:"API_TELEGRAM_FEED_CHAT_IDS" required:"true"`
+}
+
+type DbConfig struct {
+	Uri      string `envconfig:"DB_URI" default:"mongodb://localhost:27017/?retryWrites=true&w=majority" required:"true"`
+	Name     string `envconfig:"DB_NAME" default:"sources" required:"true"`
+	UserName string `envconfig:"DB_USERNAME" default:""`
+	Password string `envconfig:"DB_PASSWORD" default:""`
+	Table    struct {
+		Name  string `envconfig:"DB_TABLE_NAME" default:"tgchans" required:"true"`
+		Shard bool   `envconfig:"DB_TABLE_SHARD" default:"true"`
+	}
+	Tls struct {
+		Enabled  bool `envconfig:"DB_TLS_ENABLED" default:"false" required:"true"`
+		Insecure bool `envconfig:"DB_TLS_INSECURE" default:"false" required:"true"`
+	}
+}
+
+type ReplicaConfig struct {
+	Range uint32 `envconfig:"REPLICA_RANGE" required:"true"`
+	Name  string `envconfig:"REPLICA_NAME" required:"true"`
 }
 
 func NewConfigFromEnv() (cfg Config, err error) {

@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "source-telegram.fullname" . }}
   labels:
@@ -51,6 +51,12 @@ spec:
               value: "{{ .Values.api.writer.uri }}"
             - name: LOG_LEVEL
               value: "{{ .Values.log.level }}"
+            - name: REPLICA_RANGE
+              value: "{{ .Values.replicaCount }}"
+            - name: REPLICA_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
           stdin: true
           tty: true
           securityContext:
