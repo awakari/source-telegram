@@ -68,8 +68,6 @@ nodeSelector: {}
 
 tolerations: []
 
-affinity: {}
-
 api:
   writer:
     uri: "resolver:50051"
