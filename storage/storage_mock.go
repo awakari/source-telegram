@@ -28,10 +28,12 @@ func (s storageMock) GetPage(ctx context.Context, filter model.ChannelFilter, li
 			{
 				Id:   -1001801930101,
 				Name: "channel0",
+				Link: "https://t.me/channel0",
 			},
 			{
 				Id:   -1001754252633,
 				Name: "channel1",
+				Link: "https://t.me/c/1/2",
 			},
 		}
 	}

@@ -144,44 +144,55 @@ func main() {
 		IdDiv: cfg.Replica.Range,
 		IdRem: replicaIndex,
 	}
-	var chanCursor string
-	for {
-		var chans []model.Channel
-		chans, err = stor.GetPage(context.TODO(), chanFilter, 0x100, chanCursor)
-		if err != nil {
-			panic(err)
-		}
-		if len(chans) == 0 {
-			break
-		}
-		chanCursor = chans[len(chans)-1].Name
-		for _, ch := range chans {
-			var chat *client.Chat
-			chat, err = clientTg.GetChat(&client.GetChatRequest{
-				ChatId: ch.Id,
-			})
+	var chans []model.Channel
+	chans, err = stor.GetPage(context.TODO(), chanFilter, 1_000_000, "") // it's important to get all at once
+	if err != nil {
+		panic(err)
+	}
+	for _, ch := range chans {
+		var chat *client.Chat
+		chat, err = clientTg.GetChat(&client.GetChatRequest{
+			ChatId: ch.Id,
+		})
+		switch err {
+		case nil:
+			var link *client.MessageLink
+			if chat.LastMessage != nil || chat.LastMessage.ForwardInfo == nil {
+				link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
+					ChatId:    chat.Id,
+					MessageId: chat.LastMessage.Id,
+				})
+				if err != nil {
+					log.Warn(fmt.Sprintf("Last message link: %+v, err: %s", link, err))
+				}
+			}
+			if link != nil && link.Link != "" {
+				switch link.IsPublic {
+				case true:
+					ch.Link = link.Link[:strings.LastIndex(link.Link, "/")] // truncate msg id
+				default:
+					ch.Link = link.Link // full message link
+				}
+			}
+			if ch.Name == "" || ch.Name != chat.Title {
+				ch.Name = chat.Title
+			}
+			err = stor.Update(context.TODO(), ch)
+			if err != nil {
+				log.Error(fmt.Sprintf("Failed to update chat %+v title in DB", ch))
+			}
+			log.Debug(fmt.Sprintf("Selected chat id: %d, title: %s", ch.Id, chat.Title))
+			var w modelAwk.Writer[*pb.CloudEvent]
+			userId := strconv.FormatInt(ch.Id, 10)
+			w, err = clientAwk.OpenMessagesWriter(ctxGroupId, userId)
 			switch err {
 			case nil:
-				if ch.Name != chat.Title {
-					ch.Name = chat.Title
-					err = stor.Update(context.TODO(), ch)
-					if err != nil {
-						log.Error(fmt.Sprintf("Failed to update chat %+v title in DB", ch))
-					}
-				}
-				log.Debug(fmt.Sprintf("Selected chat id: %d, title: %s", ch.Id, chat.Title))
-				var w modelAwk.Writer[*pb.CloudEvent]
-				userId := strconv.FormatInt(ch.Id, 10)
-				w, err = clientAwk.OpenMessagesWriter(ctxGroupId, userId)
-				switch err {
-				case nil:
-					chatWriters[ch.Id] = w
-				default:
-					log.Error(fmt.Sprintf("Failed to open a writer for the chat id: %d, cause: %s", ch.Id, err))
-				}
+				chatWriters[ch.Id] = w
 			default:
-				log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", ch.Id, err))
+				log.Error(fmt.Sprintf("Failed to open a writer for the chat id: %d, cause: %s", ch.Id, err))
 			}
+		default:
+			log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", ch.Id, err))
 		}
 	}
 	defer func() {
@@ -199,9 +210,7 @@ func main() {
 	//}()
 
 	log.Info(fmt.Sprintf("starting to listen the API @ port #%d...", cfg.Api.Port))
-	if err = apiGrpc.Serve(stor, cfg.Api.Port); err != nil {
-		panic(err)
-	}
+	go apiGrpc.Serve(stor, cfg.Api.Port)
 
 	//
 	listener := clientTg.GetListener()

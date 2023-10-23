@@ -29,6 +29,7 @@ func (c controller) List(ctx context.Context, req *ListRequest) (resp *ListRespo
 			resp.Page = append(resp.Page, &Channel{
 				Id:   ch.Id,
 				Name: ch.Name,
+				Link: ch.Link,
 			})
 		}
 	}

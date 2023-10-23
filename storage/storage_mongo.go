@@ -15,10 +15,12 @@ import (
 type recChan struct {
 	Id   int64  `bson:"id"`
 	Name string `bson:"name"`
+	Link string `bson:"link"`
 }
 
 const attrId = "id"
 const attrName = "name"
+const attrLink = "link"
 
 type storageMongo struct {
 	conn *mongo.Client
@@ -37,6 +39,10 @@ var projGetBatch = bson.D{
 	},
 	{
 		Key:   attrName,
+		Value: 1,
+	},
+	{
+		Key:   attrLink,
 		Value: 1,
 	},
 }
@@ -61,7 +67,7 @@ var indices = []mongo.IndexModel{
 	{
 		Keys: bson.D{
 			{
-				Key:   attrName,
+				Key:   attrLink,
 				Value: 1,
 			},
 		},
@@ -118,6 +124,7 @@ func (sm storageMongo) Update(ctx context.Context, ch model.Channel) (err error)
 	u := bson.M{
 		"$set": bson.M{
 			attrName: ch.Name,
+			attrLink: ch.Link,
 		},
 	}
 	var result *mongo.UpdateResult
@@ -134,10 +141,11 @@ func (sm storageMongo) Update(ctx context.Context, ch model.Channel) (err error)
 }
 
 func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error) {
-	q := bson.M{
-		attrName: bson.M{
+	q := bson.M{}
+	if cursor != "" {
+		q[attrLink] = bson.M{
 			"$gt": cursor,
-		},
+		}
 	}
 	if filter.IdDiv != 0 {
 		q[attrId] = bson.M{
@@ -163,6 +171,7 @@ func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, 
 				page = append(page, model.Channel{
 					Id:   rec.Id,
 					Name: rec.Name,
+					Link: rec.Link,
 				})
 			}
 		}

@@ -68,11 +68,13 @@ func TestStorageMongo_Update(t *testing.T) {
 	err = s.Update(ctx, model.Channel{
 		Id:   -1001801930101,
 		Name: "channel0",
+		Link: "https://t.me/channel0",
 	})
 	assert.Nil(t, err)
 	err = s.Update(ctx, model.Channel{
 		Id:   -1001024068640,
 		Name: "channel1",
+		Link: "https://t.me/channel1",
 	})
 	assert.ErrorIs(t, err, ErrNotFound)
 }
@@ -107,6 +109,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 		_, err = sm.coll.InsertOne(ctx, bson.M{
 			attrId:   id,
 			attrName: strconv.FormatInt(id, 10),
+			attrLink: fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-id, 10)),
 		})
 		require.Nil(t, err)
 	}
@@ -143,7 +146,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 		},
 		"cursor": {
 			limit:  10,
-			cursor: strconv.FormatInt(ids[1], 10),
+			cursor: fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-ids[1], 10)),
 			page: []int64{
 				ids[2],
 				ids[3],
@@ -152,7 +155,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 		},
 		"end of results": {
 			limit:  10,
-			cursor: strconv.FormatInt(ids[4], 10),
+			cursor: fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-ids[4], 10)),
 		},
 	}
 	//
@@ -164,6 +167,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			for i, ch := range page {
 				assert.Equal(t, c.page[i], ch.Id)
 				assert.Equal(t, strconv.FormatInt(c.page[i], 10), ch.Name)
+				assert.Equal(t, fmt.Sprintf("https://t.me/c/%d/123", -c.page[i]), ch.Link)
 			}
 			assert.ErrorIs(t, err, c.err)
 		})
