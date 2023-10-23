@@ -48,7 +48,7 @@ var projGetBatch = bson.D{
 }
 var sortGetBatch = bson.D{
 	{
-		Key:   attrName,
+		Key:   attrLink,
 		Value: 1,
 	},
 }
