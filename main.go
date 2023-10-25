@@ -218,7 +218,7 @@ func main() {
 	h := update.NewHandler(listener, msgHandler)
 	b := backoff.NewExponentialBackOff()
 	err = backoff.RetryNotify(h.Listen, b, func(err error, d time.Duration) {
-		log.Warn(fmt.Sprintf("Failed to handle an update, cause: %s, retrying in: %s...", err, d))
+		log.Error(fmt.Sprintf("Failed to handle an update, cause: %s, retrying in: %s...", err, d))
 	})
 	if err != nil {
 		panic(err)

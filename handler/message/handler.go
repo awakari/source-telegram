@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/akurilov/go-tdlib/client"
+	"github.com/awakari/client-sdk-go/api/grpc/limits"
 	"github.com/awakari/client-sdk-go/model"
 	"github.com/awakari/source-telegram/handler"
 	"github.com/cenkalti/backoff/v4"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"log/slog"
 	"strconv"
+	"time"
 )
 
 type msgHandler struct {
@@ -109,16 +111,25 @@ func (h msgHandler) handleMessage(w model.Writer[*pb.CloudEvent], msg *client.Me
 		evts := []*pb.CloudEvent{
 			evt,
 		}
-		err = backoff.Retry(
+		err = backoff.RetryNotify(
 			func() (err error) {
 				var ackCount uint32
 				ackCount, err = w.WriteBatch(evts)
-				if err == nil && ackCount < 1 {
-					err = errNoAck
+				switch {
+				case err == nil:
+					if ackCount < 1 {
+						err = errNoAck
+					}
+				case errors.Is(err, limits.ErrReached):
+					h.log.Warn(fmt.Sprintf("Dropping the message %d from the chat %d, daily limit reached", msg.Id, msg.ChatId))
+					err = nil
 				}
 				return
 			},
 			h.b,
+			func(err error, d time.Duration) {
+				h.log.Error(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
+			},
 		)
 	}
 	return
