@@ -1,7 +1,9 @@
 package model
 
 type Channel struct {
-	Id   int64
-	Name string
-	Link string
+	Id      int64
+	GroupId string
+	UserId  string
+	Name    string
+	Link    string
 }

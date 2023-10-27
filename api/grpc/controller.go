@@ -19,11 +19,60 @@ func NewController(stor storage.Storage) ServiceServer {
 	}
 }
 
+func (c controller) Create(ctx context.Context, req *CreateRequest) (resp *CreateResponse, err error) {
+	resp = &CreateResponse{}
+	if req.Channel == nil {
+		err = status.Error(codes.InvalidArgument, "channel payload is missing")
+	}
+	if err == nil {
+		ch := model.Channel{
+			Id:      req.Channel.Id,
+			GroupId: req.Channel.GroupId,
+			UserId:  req.Channel.UserId,
+			Name:    req.Channel.Name,
+			Link:    req.Channel.Link,
+		}
+		err = c.stor.Create(ctx, ch)
+		err = encodeError(err)
+	}
+	return
+}
+
+func (c controller) Read(ctx context.Context, req *ReadRequest) (resp *ReadResponse, err error) {
+	resp = &ReadResponse{}
+	var ch model.Channel
+	ch, err = c.stor.Read(ctx, req.Link)
+	switch err {
+	case nil:
+		resp.Channel = &Channel{
+			Id:      ch.Id,
+			GroupId: ch.GroupId,
+			UserId:  ch.UserId,
+			Name:    ch.Name,
+			Link:    ch.Link,
+		}
+	default:
+		err = encodeError(err)
+	}
+	return
+}
+
+func (c controller) Delete(ctx context.Context, req *DeleteRequest) (resp *DeleteResponse, err error) {
+	resp = &DeleteResponse{}
+	err = c.stor.Delete(ctx, req.Link)
+	err = encodeError(err)
+	return
+}
+
 func (c controller) List(ctx context.Context, req *ListRequest) (resp *ListResponse, err error) {
-	filterNone := model.ChannelFilter{}
 	resp = &ListResponse{}
+	filter := model.ChannelFilter{}
+	if req.Filter != nil {
+		filter.GroupId = req.Filter.GroupId
+		filter.UserId = req.Filter.UserId
+	}
 	var page []model.Channel
-	page, err = c.stor.GetPage(ctx, filterNone, req.Limit, req.Cursor)
+	page, err = c.stor.GetPage(ctx, filter, req.Limit, req.Cursor)
 	if len(page) > 0 {
 		for _, ch := range page {
 			resp.Page = append(resp.Page, &Channel{

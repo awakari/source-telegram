@@ -13,12 +13,16 @@ import (
 )
 
 type recChan struct {
-	Id   int64  `bson:"id"`
-	Name string `bson:"name"`
-	Link string `bson:"link"`
+	Id      int64  `bson:"id"`
+	GroupId string `bson:"groupId"`
+	UserId  string `bson:"userId"`
+	Name    string `bson:"name"`
+	Link    string `bson:"link"`
 }
 
 const attrId = "id"
+const attrGroupId = "groupId"
+const attrUserId = "userId"
 const attrName = "name"
 const attrLink = "link"
 
@@ -31,7 +35,30 @@ type storageMongo struct {
 var optsSrvApi = options.ServerAPI(options.ServerAPIVersion1)
 var optsGet = options.
 	FindOne().
-	SetShowRecordID(false)
+	SetShowRecordID(false).
+	SetProjection(projGet)
+var projGet = bson.D{
+	{
+		Key:   attrId,
+		Value: 1,
+	},
+	{
+		Key:   attrGroupId,
+		Value: 1,
+	},
+	{
+		Key:   attrUserId,
+		Value: 1,
+	},
+	{
+		Key:   attrName,
+		Value: 1,
+	},
+	{
+		Key:   attrLink,
+		Value: 1,
+	},
+}
 var projGetBatch = bson.D{
 	{
 		Key:   attrId,
@@ -73,7 +100,7 @@ var indices = []mongo.IndexModel{
 		},
 		Options: options.
 			Index().
-			SetUnique(false),
+			SetUnique(true),
 	},
 }
 
@@ -117,25 +144,54 @@ func (sm storageMongo) Close() error {
 	return sm.conn.Disconnect(context.TODO())
 }
 
-func (sm storageMongo) Update(ctx context.Context, ch model.Channel) (err error) {
+func (sm storageMongo) Create(ctx context.Context, ch model.Channel) (err error) {
+	rec := recChan{
+		Id:      ch.Id,
+		GroupId: ch.GroupId,
+		UserId:  ch.UserId,
+		Name:    ch.Name,
+		Link:    ch.Link,
+	}
+	_, err = sm.coll.InsertOne(ctx, rec)
+	err = decodeError(err, ch.Link)
+	return
+}
+
+func (sm storageMongo) Read(ctx context.Context, link string) (ch model.Channel, err error) {
 	q := bson.M{
-		attrId: ch.Id,
+		attrLink: link,
 	}
-	u := bson.M{
-		"$set": bson.M{
-			attrName: ch.Name,
-			attrLink: ch.Link,
-		},
+	var result *mongo.SingleResult
+	result = sm.coll.FindOne(ctx, q, optsGet)
+	err = result.Err()
+	var rec recChan
+	if err == nil {
+		err = result.Decode(&rec)
 	}
-	var result *mongo.UpdateResult
-	result, err = sm.coll.UpdateOne(ctx, q, u)
+	if err == nil {
+		ch.Id = rec.Id
+		ch.GroupId = rec.GroupId
+		ch.UserId = rec.UserId
+		ch.Name = rec.Name
+		ch.Link = rec.Link
+	}
+	err = decodeError(err, link)
+	return
+}
+
+func (sm storageMongo) Delete(ctx context.Context, link string) (err error) {
+	q := bson.M{
+		attrLink: link,
+	}
+	var result *mongo.DeleteResult
+	result, err = sm.coll.DeleteOne(ctx, q)
 	switch err {
 	case nil:
-		if result.MatchedCount < 1 {
-			err = fmt.Errorf("%w: %d", ErrNotFound, ch.Id)
+		if result.DeletedCount < 1 {
+			err = fmt.Errorf("%w by link %s", ErrNotFound, link)
 		}
 	default:
-		err = decodeError(err, ch.Id)
+		err = decodeError(err, link)
 	}
 	return
 }
@@ -154,6 +210,10 @@ func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, 
 				-int32(filter.IdRem),
 			},
 		}
+	}
+	if filter.UserId != "" {
+		q[attrGroupId] = filter.GroupId
+		q[attrUserId] = filter.UserId
 	}
 	optsList := options.
 		Find().
@@ -176,17 +236,17 @@ func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, 
 			}
 		}
 	}
-	err = decodeError(err, 0)
+	err = decodeError(err, cursor)
 	return
 }
 
-func decodeError(src error, id int64) (dst error) {
+func decodeError(src error, link string) (dst error) {
 	switch {
 	case src == nil:
 	case errors.Is(src, mongo.ErrNoDocuments):
-		dst = fmt.Errorf("%w: %d", ErrNotFound, id)
+		dst = fmt.Errorf("%w: %s", ErrNotFound, link)
 	case mongo.IsDuplicateKeyError(src):
-		dst = fmt.Errorf("%w: %d", ErrConflict, id)
+		dst = fmt.Errorf("%w: %s", ErrConflict, link)
 	default:
 		dst = fmt.Errorf("%w: %s", ErrInternal, src)
 	}

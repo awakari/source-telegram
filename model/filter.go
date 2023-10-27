@@ -7,4 +7,7 @@ type ChannelFilter struct {
 
 	// IdRem is used to select only channel ids that have the remainder equal to -IdRem.
 	IdRem uint32
+
+	GroupId string
+	UserId  string
 }

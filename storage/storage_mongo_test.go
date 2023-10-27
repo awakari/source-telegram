@@ -41,7 +41,7 @@ func clear(ctx context.Context, t *testing.T, s storageMongo) {
 	require.Nil(t, s.Close())
 }
 
-func TestStorageMongo_Update(t *testing.T) {
+func TestStorageMongo_Create(t *testing.T) {
 	//
 	collName := fmt.Sprintf("feeds-test-%d", time.Now().UnixMicro())
 	dbCfg := config.DbConfig{
@@ -61,22 +61,148 @@ func TestStorageMongo_Update(t *testing.T) {
 	defer clear(ctx, t, s.(storageMongo))
 	//
 	_, err = sm.coll.InsertOne(ctx, bson.M{
-		attrId: -1001801930101,
+		attrId:   -1001801930101,
+		attrLink: "https://t.me/chan0",
 	})
 	require.Nil(t, err)
 	//
-	err = s.Update(ctx, model.Channel{
-		Id:   -1001801930101,
-		Name: "channel0",
-		Link: "https://t.me/channel0",
+	cases := map[string]struct {
+		in  model.Channel
+		err error
+	}{
+		"ok": {
+			in: model.Channel{
+				Id:   -1001801930102,
+				Link: "https://t.me/chan1",
+			},
+		},
+		"dup id": {
+			in: model.Channel{
+				Id:   -1001801930101,
+				Link: "https://t.me/chan1",
+			},
+			err: ErrConflict,
+		},
+		"dup link": {
+			in: model.Channel{
+				Id:   -1001801930102,
+				Link: "https://t.me/chan0",
+			},
+			err: ErrConflict,
+		},
+	}
+	//
+	for k, c := range cases {
+		t.Run(k, func(t *testing.T) {
+			err = s.Create(ctx, c.in)
+			assert.ErrorIs(t, err, c.err)
+		})
+	}
+}
+
+func TestStorageMongo_Read(t *testing.T) {
+	//
+	collName := fmt.Sprintf("feeds-test-%d", time.Now().UnixMicro())
+	dbCfg := config.DbConfig{
+		Uri:  dbUri,
+		Name: "sources",
+	}
+	dbCfg.Table.Name = collName
+	dbCfg.Tls.Enabled = true
+	dbCfg.Tls.Insecure = true
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+	defer cancel()
+	s, err := NewStorage(ctx, dbCfg)
+	require.Nil(t, err)
+	assert.NotNil(t, s)
+	//
+	sm := s.(storageMongo)
+	defer clear(ctx, t, s.(storageMongo))
+	//
+	_, err = sm.coll.InsertOne(ctx, bson.M{
+		attrId:      -1001801930101,
+		attrGroupId: "group0",
+		attrUserId:  "user0",
+		attrName:    "channel 0",
+		attrLink:    "https://t.me/chan0",
 	})
-	assert.Nil(t, err)
-	err = s.Update(ctx, model.Channel{
-		Id:   -1001024068640,
-		Name: "channel1",
-		Link: "https://t.me/channel1",
+	require.Nil(t, err)
+	//
+	cases := map[string]struct {
+		link string
+		out  model.Channel
+		err  error
+	}{
+		"ok": {
+			link: "https://t.me/chan0",
+			out: model.Channel{
+				Id:      -1001801930101,
+				GroupId: "group0",
+				UserId:  "user0",
+				Name:    "channel 0",
+				Link:    "https://t.me/chan0",
+			},
+		},
+		"dup id": {
+			link: "https://t.me/chan1",
+			err:  ErrNotFound,
+		},
+	}
+	//
+	for k, c := range cases {
+		t.Run(k, func(t *testing.T) {
+			var ch model.Channel
+			ch, err = s.Read(ctx, c.link)
+			assert.Equal(t, c.out, ch)
+			assert.ErrorIs(t, err, c.err)
+		})
+	}
+}
+
+func TestStorageMongo_Delete(t *testing.T) {
+	//
+	collName := fmt.Sprintf("feeds-test-%d", time.Now().UnixMicro())
+	dbCfg := config.DbConfig{
+		Uri:  dbUri,
+		Name: "sources",
+	}
+	dbCfg.Table.Name = collName
+	dbCfg.Tls.Enabled = true
+	dbCfg.Tls.Insecure = true
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+	defer cancel()
+	s, err := NewStorage(ctx, dbCfg)
+	require.Nil(t, err)
+	assert.NotNil(t, s)
+	//
+	sm := s.(storageMongo)
+	defer clear(ctx, t, s.(storageMongo))
+	//
+	_, err = sm.coll.InsertOne(ctx, bson.M{
+		attrId:   -1001801930101,
+		attrLink: "https://t.me/chan0",
 	})
-	assert.ErrorIs(t, err, ErrNotFound)
+	require.Nil(t, err)
+	//
+	cases := map[string]struct {
+		link string
+		err  error
+	}{
+		"ok": {
+			link: "https://t.me/chan0",
+		},
+		"dup id": {
+			link: "https://t.me/chan1",
+			err:  ErrNotFound,
+		},
+	}
+	//
+	for k, c := range cases {
+		t.Run(k, func(t *testing.T) {
+			err = s.Delete(ctx, c.link)
+			assert.ErrorIs(t, err, c.err)
+		})
+	}
 }
 
 func TestStorageMongo_GetPage(t *testing.T) {
@@ -165,7 +291,6 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			page, err = s.GetPage(ctx, c.filter, c.limit, c.cursor)
 			assert.Equal(t, len(c.page), len(page))
 			for i, ch := range page {
-				assert.Equal(t, c.page[i], ch.Id)
 				assert.Equal(t, strconv.FormatInt(c.page[i], 10), ch.Name)
 				assert.Equal(t, fmt.Sprintf("https://t.me/c/%d/123", -c.page[i]), ch.Link)
 			}

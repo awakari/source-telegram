@@ -26,10 +26,24 @@ func (sl storageLogging) Close() (err error) {
 	return
 }
 
-func (sl storageLogging) Update(ctx context.Context, ch model.Channel) (err error) {
-	err = sl.stor.Update(ctx, ch)
+func (sl storageLogging) Create(ctx context.Context, ch model.Channel) (err error) {
+	err = sl.stor.Create(ctx, ch)
 	ll := sl.logLevel(err)
-	sl.log.Log(ctx, ll, fmt.Sprintf("storage.Update(%+v): %s", ch, err))
+	sl.log.Log(ctx, ll, fmt.Sprintf("storage.Create(ch=%+v): %s", ch, err))
+	return
+}
+
+func (sl storageLogging) Read(ctx context.Context, link string) (ch model.Channel, err error) {
+	ch, err = sl.stor.Read(ctx, link)
+	ll := sl.logLevel(err)
+	sl.log.Log(ctx, ll, fmt.Sprintf("storage.Read(%s): %+v, %s", link, ch, err))
+	return
+}
+
+func (sl storageLogging) Delete(ctx context.Context, link string) (err error) {
+	err = sl.stor.Delete(ctx, link)
+	ll := sl.logLevel(err)
+	sl.log.Log(ctx, ll, fmt.Sprintf("storage.Delete(%s): %s", link, err))
 	return
 }
 

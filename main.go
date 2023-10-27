@@ -94,18 +94,13 @@ func main() {
 	}
 	log.Info(fmt.Sprintf("Me: %s %s [%v]", me.FirstName, me.LastName, me.Usernames))
 
-	// get all chats into the cache - get chat by id won't work w/o this
-	_, err = clientTg.GetChats(&client.GetChatsRequest{Limit: 1000})
-	if err != nil {
-		panic(err)
-	}
-
 	// init the channel storage
 	var stor storage.Storage
 	stor, err = storage.NewStorage(context.TODO(), cfg.Db)
 	if err != nil {
 		panic(err)
 	}
+	stor = storage.NewStorageLogging(stor, log)
 	defer stor.Close()
 
 	// init the Awakari writer
@@ -138,7 +133,14 @@ func main() {
 	replicaIndex := uint32(replicaIndexTmp)
 	log.Info(fmt.Sprintf("Replica: %d/%d", replicaIndex, cfg.Replica.Range))
 
-	// load the configured chats info
+	// get all joined chats
+	var chatsJoined *client.Chats
+	chatsJoined, err = clientTg.GetChats(&client.GetChatsRequest{Limit: 1000})
+	if err != nil {
+		panic(err)
+	}
+
+	// load the existing channels info
 	chatWriters := map[int64]modelAwk.Writer[*pb.CloudEvent]{}
 	chanFilter := model.ChannelFilter{
 		IdDiv: cfg.Replica.Range,
@@ -150,38 +152,15 @@ func main() {
 		panic(err)
 	}
 	for _, ch := range chans {
-		var chat *client.Chat
-		chat, err = clientTg.GetChat(&client.GetChatRequest{
-			ChatId: ch.Id,
-		})
-		switch err {
-		case nil:
-			var link *client.MessageLink
-			if chat.LastMessage != nil || chat.LastMessage.ForwardInfo == nil {
-				link, err = clientTg.GetMessageLink(&client.GetMessageLinkRequest{
-					ChatId:    chat.Id,
-					MessageId: chat.LastMessage.Id,
-				})
-				if err != nil {
-					log.Warn(fmt.Sprintf("Last message link: %+v, err: %s", link, err))
-				}
+		var joined bool
+		for _, chatJoinedId := range chatsJoined.ChatIds {
+			if ch.Id == chatJoinedId {
+				joined = true
+				break
 			}
-			if link != nil && link.Link != "" {
-				switch link.IsPublic {
-				case true:
-					ch.Link = link.Link[:strings.LastIndex(link.Link, "/")] // truncate msg id
-				default:
-					ch.Link = link.Link // full message link
-				}
-			}
-			if ch.Name == "" || ch.Name != chat.Title {
-				ch.Name = chat.Title
-			}
-			err = stor.Update(context.TODO(), ch)
-			if err != nil {
-				log.Error(fmt.Sprintf("Failed to update chat %+v title in DB", ch))
-			}
-			log.Debug(fmt.Sprintf("Selected chat id: %d, title: %s", ch.Id, chat.Title))
+		}
+		if joined {
+			log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s", ch.Id, ch.Name))
 			var w modelAwk.Writer[*pb.CloudEvent]
 			userId := strconv.FormatInt(ch.Id, 10)
 			w, err = clientAwk.OpenMessagesWriter(ctxGroupId, userId)
@@ -191,8 +170,6 @@ func main() {
 			default:
 				log.Error(fmt.Sprintf("Failed to open a writer for the chat id: %d, cause: %s", ch.Id, err))
 			}
-		default:
-			log.Error(fmt.Sprintf("Failed to get chat info by id: %d, cause: %s", ch.Id, err))
 		}
 	}
 	defer func() {
