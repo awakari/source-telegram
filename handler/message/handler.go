@@ -1,23 +1,29 @@
 package message
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/akurilov/go-tdlib/client"
+	"github.com/awakari/client-sdk-go/api"
 	"github.com/awakari/client-sdk-go/api/grpc/limits"
-	"github.com/awakari/client-sdk-go/model"
+	modelAwk "github.com/awakari/client-sdk-go/model"
 	"github.com/awakari/source-telegram/handler"
+	"github.com/awakari/source-telegram/model"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
 	"github.com/google/uuid"
+	"google.golang.org/grpc/metadata"
 	"log/slog"
 	"strconv"
 	"time"
 )
 
 type msgHandler struct {
+	clientAwk   api.Client
 	clientTg    *client.Client
-	chatWriters map[int64]model.Writer[*pb.CloudEvent]
+	chansJoined map[int64]model.Channel
+	writers     map[int64]modelAwk.Writer[*pb.CloudEvent]
 	b           *backoff.ExponentialBackOff
 	log         *slog.Logger
 }
@@ -46,25 +52,65 @@ const attrKeyFileType = "tgfiletype"
 
 var errNoAck = errors.New("event was not accepted")
 
-func NewHandler(clientTg *client.Client, chatWriters map[int64]model.Writer[*pb.CloudEvent], log *slog.Logger) handler.Handler[*client.Message] {
+func NewHandler(
+	clientAwk api.Client,
+	clientTg *client.Client,
+	chansJoined map[int64]model.Channel,
+	log *slog.Logger,
+) handler.Handler[*client.Message] {
 	return msgHandler{
+		clientAwk:   clientAwk,
 		clientTg:    clientTg,
-		chatWriters: chatWriters,
+		chansJoined: chansJoined,
+		writers:     map[int64]modelAwk.Writer[*pb.CloudEvent]{},
 		b:           backoff.NewExponentialBackOff(),
 		log:         log,
 	}
 }
 
 func (h msgHandler) Handle(msg *client.Message) (err error) {
-	var w model.Writer[*pb.CloudEvent]
-	w, chatOk := h.chatWriters[msg.ChatId]
-	if chatOk {
+	chanId := msg.ChatId
+	var w modelAwk.Writer[*pb.CloudEvent]
+	w, ok := h.writers[chanId]
+	if !ok {
+		h.log.Debug(fmt.Sprintf("Writer not found for channel id = %d", chanId))
+		var ch model.Channel
+		ch, ok = h.chansJoined[chanId]
+		switch ok {
+		case true:
+			ctxGroupId := metadata.AppendToOutgoingContext(context.TODO(), "x-awakari-group-id", ch.GroupId)
+			userId := ch.UserId
+			if userId == "" {
+				userId = ch.Link
+			}
+			w, err = h.clientAwk.OpenMessagesWriter(ctxGroupId, userId)
+			if err == nil {
+				h.writers[chanId] = w
+			}
+		default:
+			h.log.Debug(fmt.Sprintf("No channel joined found for id = %d", chanId))
+		}
+	}
+	if w != nil {
 		err = h.handleMessage(w, msg)
+		if err != nil {
+			h.log.Warn(fmt.Sprintf("Message handle failure, closing the writer: %s", err))
+			_ = w.Close()
+			delete(h.writers, chanId)
+		}
 	}
 	return
 }
 
-func (h msgHandler) handleMessage(w model.Writer[*pb.CloudEvent], msg *client.Message) (err error) {
+func (h msgHandler) Close() (err error) {
+	for _, w := range h.writers {
+		_ = w.Close()
+	}
+	clear(h.writers)
+	return
+}
+
+func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client.Message) (err error) {
 	//
 	evt := &pb.CloudEvent{
 		Id:          uuid.NewString(),
@@ -79,7 +125,7 @@ func (h msgHandler) handleMessage(w model.Writer[*pb.CloudEvent], msg *client.Me
 		},
 	}
 	//
-	err = h.convertSource(msg, evt)
+	h.convertSource(msg, evt)
 	//
 	content := msg.Content
 	switch content.MessageContentType() {
@@ -135,8 +181,9 @@ func (h msgHandler) handleMessage(w model.Writer[*pb.CloudEvent], msg *client.Me
 	return
 }
 
-func (h msgHandler) convertSource(msg *client.Message, evt *pb.CloudEvent) (err error) {
+func (h msgHandler) convertSource(msg *client.Message, evt *pb.CloudEvent) {
 	var link *client.MessageLink
+	var err error
 	link, err = h.clientTg.GetMessageLink(&client.GetMessageLinkRequest{
 		ChatId:    msg.ChatId,
 		MessageId: msg.Id,
@@ -145,6 +192,7 @@ func (h msgHandler) convertSource(msg *client.Message, evt *pb.CloudEvent) (err 
 	case nil:
 		evt.Source = link.Link
 	default:
+		h.log.Warn(fmt.Sprintf("Failed to get the message %d from chat %d link: %s", msg.Id, msg.ChatId, err))
 		evt.Source = strconv.FormatInt(msg.Id, 10)
 	}
 	return

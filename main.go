@@ -4,15 +4,12 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	modelAwk "github.com/awakari/client-sdk-go/model"
 	apiGrpc "github.com/awakari/source-telegram/api/grpc"
 	"github.com/awakari/source-telegram/config"
 	"github.com/awakari/source-telegram/handler/message"
 	"github.com/awakari/source-telegram/handler/update"
 	"github.com/awakari/source-telegram/model"
 	"github.com/awakari/source-telegram/storage"
-	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
-	"google.golang.org/grpc/metadata"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -114,11 +111,6 @@ func main() {
 	}
 	log.Info("initialized the Awakari API client")
 	defer clientAwk.Close()
-	ctxGroupId := metadata.AppendToOutgoingContext(
-		context.TODO(),
-		"x-awakari-group-id",
-		"com.github.awakari.source-telegram",
-	)
 
 	// determine the replica index
 	replicaNameParts := strings.Split(cfg.Replica.Name, "-")
@@ -141,7 +133,7 @@ func main() {
 	}
 
 	// load the existing channels info
-	chatWriters := map[int64]modelAwk.Writer[*pb.CloudEvent]{}
+	chansJoined := map[int64]model.Channel{}
 	chanFilter := model.ChannelFilter{
 		IdDiv: cfg.Replica.Range,
 		IdRem: replicaIndex,
@@ -161,25 +153,13 @@ func main() {
 		}
 		if joined {
 			log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s", ch.Id, ch.Name))
-			var w modelAwk.Writer[*pb.CloudEvent]
-			userId := strconv.FormatInt(ch.Id, 10)
-			w, err = clientAwk.OpenMessagesWriter(ctxGroupId, userId)
-			switch err {
-			case nil:
-				chatWriters[ch.Id] = w
-			default:
-				log.Error(fmt.Sprintf("Failed to open a writer for the chat id: %d, cause: %s", ch.Id, err))
-			}
+			chansJoined[ch.Id] = ch
 		}
 	}
-	defer func() {
-		for _, w := range chatWriters {
-			_ = w.Close()
-		}
-	}()
 
 	// init handlers
-	msgHandler := message.NewHandler(clientTg, chatWriters, log)
+	msgHandler := message.NewHandler(clientAwk, clientTg, chansJoined, log)
+	defer msgHandler.Close()
 
 	// expose the profiling
 	//go func() {
@@ -193,6 +173,7 @@ func main() {
 	listener := clientTg.GetListener()
 	defer listener.Close()
 	h := update.NewHandler(listener, msgHandler)
+	defer h.Close()
 	b := backoff.NewExponentialBackOff()
 	err = backoff.RetryNotify(h.Listen, b, func(err error, d time.Duration) {
 		log.Error(fmt.Sprintf("Failed to handle an update, cause: %s, retrying in: %s...", err, d))

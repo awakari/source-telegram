@@ -59,20 +59,6 @@ var projGet = bson.D{
 		Value: 1,
 	},
 }
-var projGetBatch = bson.D{
-	{
-		Key:   attrId,
-		Value: 1,
-	},
-	{
-		Key:   attrName,
-		Value: 1,
-	},
-	{
-		Key:   attrLink,
-		Value: 1,
-	},
-}
 var sortGetBatch = bson.D{
 	{
 		Key:   attrLink,
@@ -220,7 +206,7 @@ func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, 
 		SetLimit(int64(limit)).
 		SetShowRecordID(false).
 		SetSort(sortGetBatch).
-		SetProjection(projGetBatch)
+		SetProjection(projGet)
 	var cur *mongo.Cursor
 	cur, err = sm.coll.Find(ctx, q, optsList)
 	if err == nil {
@@ -229,9 +215,11 @@ func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, 
 			err = errors.Join(err, cur.Decode(&rec))
 			if err == nil {
 				page = append(page, model.Channel{
-					Id:   rec.Id,
-					Name: rec.Name,
-					Link: rec.Link,
+					Id:      rec.Id,
+					GroupId: rec.GroupId,
+					UserId:  rec.UserId,
+					Name:    rec.Name,
+					Link:    rec.Link,
 				})
 			}
 		}

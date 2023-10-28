@@ -76,9 +76,11 @@ func (c controller) List(ctx context.Context, req *ListRequest) (resp *ListRespo
 	if len(page) > 0 {
 		for _, ch := range page {
 			resp.Page = append(resp.Page, &Channel{
-				Id:   ch.Id,
-				Name: ch.Name,
-				Link: ch.Link,
+				Id:      ch.Id,
+				GroupId: ch.GroupId,
+				UserId:  ch.UserId,
+				Name:    ch.Name,
+				Link:    ch.Link,
 			})
 		}
 	}

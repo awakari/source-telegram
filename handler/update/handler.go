@@ -45,3 +45,7 @@ func (h updateHandler) Listen() (err error) {
 	}
 	return
 }
+
+func (h updateHandler) Close() error {
+	return nil
+}
