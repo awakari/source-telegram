@@ -152,9 +152,9 @@ func main() {
 			}
 		}
 		if !joined {
-	            _, err = clientTg.JoinChat(&client.JoinChatRequest{
-	                ChatId: ch.Id,
-	            })
+	        	_, err = clientTg.JoinChat(&client.JoinChatRequest{
+	        		ChatId: ch.Id,
+	        	})
 	        }
 	        switch err {
 	        case nil:
