@@ -151,10 +151,19 @@ func main() {
 				break
 			}
 		}
-		if joined {
-			log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s", ch.Id, ch.Name))
-			chansJoined[ch.Id] = ch
-		}
+		if !joined {
+	            _, err = clientTg.JoinChat(&client.JoinChatRequest{
+	                ChatId: ch.Id,
+	            })
+	        }
+	        switch err {
+	        case nil:
+	        	log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s", ch.Id, ch.Name))
+	        	chansJoined[ch.Id] = ch
+	        default:
+	        	log.Warn(fmt.Sprintf("Failed to join channel by id: %d, cause: %s", ch.Id, err))
+			err = nil
+	        }
 	}
 
 	// init handlers
