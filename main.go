@@ -151,9 +151,26 @@ func main() {
 				break
 			}
 		}
-		if joined {
+		if !joined {
+			_, err = clientTg.AddRecentlyFoundChat(&client.AddRecentlyFoundChatRequest{
+				ChatId: ch.Id,
+			})
+			if err == nil {
+				_, err = clientTg.JoinChat(&client.JoinChatRequest{
+					ChatId: ch.Id,
+				})
+			}
+			if err == nil {
+				joined = true
+			}
+		}
+		switch joined {
+		case true:
 			log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s", ch.Id, ch.Name))
 			chansJoined[ch.Id] = ch
+		default:
+			log.Warn(fmt.Sprintf("Failed to join channel by id: %d, cause: %s", ch.Id, err))
+			err = nil
 		}
 	}
 
