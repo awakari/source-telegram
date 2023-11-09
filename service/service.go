@@ -62,14 +62,18 @@ func (svc Service) RefreshJoined(ctx context.Context) (err error) {
 				}
 			}
 			if !joined {
+				var newChat *client.Chat
+				newChat, err = svc.ClientTg.SearchPublicChat(&client.SearchPublicChatRequest{
+					Username: ch.Link,
+				})
+				svc.Log.Debug(fmt.Sprintf("SearchPublicChat(%s): %+v, %s", ch.Name, newChat, err))
 				_, err = svc.ClientTg.AddRecentlyFoundChat(&client.AddRecentlyFoundChatRequest{
 					ChatId: ch.Id,
 				})
-				if err == nil {
-					_, err = svc.ClientTg.JoinChat(&client.JoinChatRequest{
-						ChatId: ch.Id,
-					})
-				}
+				svc.Log.Debug(fmt.Sprintf("AddRecentlyFoundChat(%d): %s", ch.Id, err))
+				_, err = svc.ClientTg.JoinChat(&client.JoinChatRequest{
+					ChatId: ch.Id,
+				})
 				if err == nil {
 					joined = true
 				}

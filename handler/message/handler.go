@@ -93,6 +93,7 @@ func (h msgHandler) Handle(msg *client.Message) (err error) {
 			}
 			w, err = h.clientAwk.OpenMessagesWriter(ctxGroupId, userId)
 			if err == nil {
+				h.log.Debug(fmt.Sprintf("New message writer is open for chanId=%d, groupId=%s, userId=%s", chanId, ch.GroupId, userId))
 				h.writers[chanId] = w
 			}
 		default:
@@ -175,7 +176,7 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 						err = errNoAck
 					}
 				case errors.Is(err, limits.ErrReached):
-					h.log.Warn(fmt.Sprintf("Dropping the message %d from the chat %d, daily limit reached", msg.Id, msg.ChatId))
+					h.log.Warn(fmt.Sprintf("Dropping the message %d from the chat %d, daily limit reached: %s", msg.Id, msg.ChatId, err))
 					err = nil
 				}
 				return
