@@ -16,16 +16,18 @@ import (
 	"google.golang.org/grpc/metadata"
 	"log/slog"
 	"strconv"
+	"sync"
 	"time"
 )
 
 type msgHandler struct {
-	clientAwk   api.Client
-	clientTg    *client.Client
-	chansJoined map[int64]model.Channel
-	writers     map[int64]modelAwk.Writer[*pb.CloudEvent]
-	b           *backoff.ExponentialBackOff
-	log         *slog.Logger
+	clientAwk       api.Client
+	clientTg        *client.Client
+	chansJoined     map[int64]model.Channel
+	chansJoinedLock *sync.Mutex
+	writers         map[int64]modelAwk.Writer[*pb.CloudEvent]
+	b               *backoff.ExponentialBackOff
+	log             *slog.Logger
 }
 
 type FileType int32
@@ -56,15 +58,17 @@ func NewHandler(
 	clientAwk api.Client,
 	clientTg *client.Client,
 	chansJoined map[int64]model.Channel,
+	chansJoinedLock *sync.Mutex,
 	log *slog.Logger,
 ) handler.Handler[*client.Message] {
 	return msgHandler{
-		clientAwk:   clientAwk,
-		clientTg:    clientTg,
-		chansJoined: chansJoined,
-		writers:     map[int64]modelAwk.Writer[*pb.CloudEvent]{},
-		b:           backoff.NewExponentialBackOff(),
-		log:         log,
+		clientAwk:       clientAwk,
+		clientTg:        clientTg,
+		chansJoined:     chansJoined,
+		chansJoinedLock: chansJoinedLock,
+		writers:         map[int64]modelAwk.Writer[*pb.CloudEvent]{},
+		b:               backoff.NewExponentialBackOff(),
+		log:             log,
 	}
 }
 
@@ -75,7 +79,11 @@ func (h msgHandler) Handle(msg *client.Message) (err error) {
 	if !ok {
 		h.log.Debug(fmt.Sprintf("Writer not found for channel id = %d", chanId))
 		var ch model.Channel
+		//
+		h.chansJoinedLock.Lock()
 		ch, ok = h.chansJoined[chanId]
+		h.chansJoinedLock.Unlock()
+		//
 		switch ok {
 		case true:
 			ctxGroupId := metadata.AppendToOutgoingContext(context.TODO(), "x-awakari-group-id", ch.GroupId)

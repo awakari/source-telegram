@@ -9,12 +9,14 @@ import (
 	"github.com/awakari/source-telegram/handler/message"
 	"github.com/awakari/source-telegram/handler/update"
 	"github.com/awakari/source-telegram/model"
+	"github.com/awakari/source-telegram/service"
 	"github.com/awakari/source-telegram/storage"
 	"log/slog"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -125,57 +127,27 @@ func main() {
 	replicaIndex := uint32(replicaIndexTmp)
 	log.Info(fmt.Sprintf("Replica: %d/%d", replicaIndex, cfg.Replica.Range))
 
-	// get all joined chats
-	var chatsJoined *client.Chats
-	chatsJoined, err = clientTg.GetChats(&client.GetChatsRequest{Limit: 1000})
-	if err != nil {
-		panic(err)
-	}
-
-	// load the existing channels info
 	chansJoined := map[int64]model.Channel{}
-	chanFilter := model.ChannelFilter{
-		IdDiv: cfg.Replica.Range,
-		IdRem: replicaIndex,
+	chansJoinedLock := &sync.Mutex{}
+
+	svc := service.Service{
+		ClientTg:        clientTg,
+		Storage:         stor,
+		ChansJoined:     chansJoined,
+		ChansJoinedLock: chansJoinedLock,
+		ReplicaRange:    cfg.Replica.Range,
+		ReplicaIndex:    replicaIndex,
+		Log:             log,
 	}
-	var chans []model.Channel
-	chans, err = stor.GetPage(context.TODO(), chanFilter, 1_000_000, "") // it's important to get all at once
-	if err != nil {
-		panic(err)
-	}
-	for _, ch := range chans {
-		var joined bool
-		for _, chatJoinedId := range chatsJoined.ChatIds {
-			if ch.Id == chatJoinedId {
-				joined = true
-				break
-			}
-		}
-		if !joined {
-			_, err = clientTg.AddRecentlyFoundChat(&client.AddRecentlyFoundChatRequest{
-				ChatId: ch.Id,
-			})
-			if err == nil {
-				_, err = clientTg.JoinChat(&client.JoinChatRequest{
-					ChatId: ch.Id,
-				})
-			}
-			if err == nil {
-				joined = true
-			}
-		}
-		switch joined {
-		case true:
-			log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s", ch.Id, ch.Name))
-			chansJoined[ch.Id] = ch
-		default:
-			log.Warn(fmt.Sprintf("Failed to join channel by id: %d, cause: %s", ch.Id, err))
-			err = nil
-		}
-	}
+	go func() {
+		b := backoff.NewExponentialBackOff()
+		_ = backoff.RetryNotify(svc.RefreshJoinedLoop, b, func(err error, d time.Duration) {
+			log.Error(fmt.Sprintf("Failed to refresh joined channels, cause: %s, retrying in: %s...", err, d))
+		})
+	}()
 
 	// init handlers
-	msgHandler := message.NewHandler(clientAwk, clientTg, chansJoined, log)
+	msgHandler := message.NewHandler(clientAwk, clientTg, chansJoined, chansJoinedLock, log)
 	defer msgHandler.Close()
 
 	// expose the profiling
