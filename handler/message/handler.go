@@ -61,13 +61,16 @@ func NewHandler(
 	chansJoinedLock *sync.Mutex,
 	log *slog.Logger,
 ) handler.Handler[*client.Message] {
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = 100 * time.Millisecond
+	b.MaxElapsedTime = 10 * time.Second
 	return msgHandler{
 		clientAwk:       clientAwk,
 		clientTg:        clientTg,
 		chansJoined:     chansJoined,
 		chansJoinedLock: chansJoinedLock,
 		writers:         map[int64]modelAwk.Writer[*pb.CloudEvent]{},
-		b:               backoff.NewExponentialBackOff(),
+		b:               b,
 		log:             log,
 	}
 }
