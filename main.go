@@ -161,12 +161,9 @@ func main() {
 	//
 	listener := clientTg.GetListener()
 	defer listener.Close()
-	h := update.NewHandler(listener, msgHandler)
+	h := update.NewHandler(listener, msgHandler, log)
 	defer h.Close()
-	b := backoff.NewExponentialBackOff()
-	err = backoff.RetryNotify(h.Listen, b, func(err error, d time.Duration) {
-		log.Error(fmt.Sprintf("Failed to handle an update, cause: %s, retrying in: %s...", err, d))
-	})
+	err = h.Listen()
 	if err != nil {
 		panic(err)
 	}

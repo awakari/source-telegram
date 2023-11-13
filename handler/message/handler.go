@@ -26,7 +26,6 @@ type msgHandler struct {
 	chansJoined     map[int64]model.Channel
 	chansJoinedLock *sync.Mutex
 	writers         map[int64]modelAwk.Writer[*pb.CloudEvent]
-	b               *backoff.ExponentialBackOff
 	log             *slog.Logger
 }
 
@@ -61,16 +60,12 @@ func NewHandler(
 	chansJoinedLock *sync.Mutex,
 	log *slog.Logger,
 ) handler.Handler[*client.Message] {
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = 100 * time.Millisecond
-	b.MaxElapsedTime = 10 * time.Second
 	return msgHandler{
 		clientAwk:       clientAwk,
 		clientTg:        clientTg,
 		chansJoined:     chansJoined,
 		chansJoinedLock: chansJoinedLock,
 		writers:         map[int64]modelAwk.Writer[*pb.CloudEvent]{},
-		b:               b,
 		log:             log,
 	}
 }
@@ -169,26 +164,37 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 		evts := []*pb.CloudEvent{
 			evt,
 		}
-		err = backoff.RetryNotify(
-			func() (err error) {
-				var ackCount uint32
-				ackCount, err = w.WriteBatch(evts)
-				switch {
-				case err == nil:
-					if ackCount < 1 {
-						err = errNoAck
-					}
-				case errors.Is(err, limits.ErrReached):
-					h.log.Warn(fmt.Sprintf("Dropping the message %d from the chat %d, daily limit reached: %s", msg.Id, msg.ChatId, err))
-					err = nil
-				}
-				return
-			},
-			h.b,
-			func(err error, d time.Duration) {
-				h.log.Error(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
-			},
-		)
+		err = h.tryWriteEventOnce(w, evts)
+		if err != nil {
+			// retry with a backoff
+			b := backoff.NewExponentialBackOff()
+			b.InitialInterval = 100 * time.Millisecond
+			b.MaxElapsedTime = 100 * time.Second
+			err = backoff.RetryNotify(
+				func() error {
+					return h.tryWriteEventOnce(w, evts)
+				},
+				b,
+				func(err error, d time.Duration) {
+					h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
+				},
+			)
+		}
+	}
+	return
+}
+
+func (h msgHandler) tryWriteEventOnce(w modelAwk.Writer[*pb.CloudEvent], evts []*pb.CloudEvent) (err error) {
+	var ackCount uint32
+	ackCount, err = w.WriteBatch(evts)
+	switch {
+	case err == nil:
+		if ackCount < 1 {
+			err = errNoAck // it's an error to retry
+		}
+	case errors.Is(err, limits.ErrReached):
+		h.log.Warn(fmt.Sprintf("Dropping the event %s, daily limit reached: %s", evts[0].Id, err))
+		err = nil
 	}
 	return
 }
