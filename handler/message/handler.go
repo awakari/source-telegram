@@ -169,16 +169,36 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 			// retry with a backoff
 			b := backoff.NewExponentialBackOff()
 			b.InitialInterval = 100 * time.Millisecond
-			b.MaxElapsedTime = 100 * time.Second
-			err = backoff.RetryNotify(
-				func() error {
-					return h.tryWriteEventOnce(w, evts)
-				},
-				b,
-				func(err error, d time.Duration) {
-					h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
-				},
-			)
+			switch {
+			case errors.Is(err, limits.ErrReached):
+				// spawn a shorter backoff just in case if the ResourceExhausted status is spurious, don't block
+				b.MaxElapsedTime = 1 * time.Second
+				go func() {
+					err = backoff.RetryNotify(
+						func() error {
+							return h.tryWriteEventOnce(w, evts)
+						},
+						b,
+						func(err error, d time.Duration) {
+							h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
+						},
+					)
+					if err != nil {
+						h.log.Warn(fmt.Sprintf("Dropping the event %s, daily limit reached: %s", evts[0].Id, err))
+					}
+				}()
+			default:
+				b.MaxElapsedTime = 100 * time.Second
+				err = backoff.RetryNotify(
+					func() error {
+						return h.tryWriteEventOnce(w, evts)
+					},
+					b,
+					func(err error, d time.Duration) {
+						h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
+					},
+				)
+			}
 		}
 	}
 	return
@@ -187,14 +207,8 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 func (h msgHandler) tryWriteEventOnce(w modelAwk.Writer[*pb.CloudEvent], evts []*pb.CloudEvent) (err error) {
 	var ackCount uint32
 	ackCount, err = w.WriteBatch(evts)
-	switch {
-	case err == nil:
-		if ackCount < 1 {
-			err = errNoAck // it's an error to retry
-		}
-	case errors.Is(err, limits.ErrReached):
-		h.log.Warn(fmt.Sprintf("Dropping the event %s, daily limit reached: %s", evts[0].Id, err))
-		err = nil
+	if err == nil && ackCount < 1 {
+		err = errNoAck // it's an error to retry
 	}
 	return
 }
