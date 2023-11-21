@@ -176,7 +176,7 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 				go func() {
 					err = backoff.RetryNotify(
 						func() error {
-							return h.tryWriteEventOnce(w, evts)
+							return h.retryWriteRejectedEvent(w, evts)
 						},
 						b,
 						func(err error, d time.Duration) {
@@ -184,7 +184,7 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 						},
 					)
 					if err != nil {
-						h.log.Warn(fmt.Sprintf("Dropping the event %s, daily limit reached: %s", evts[0].Id, err))
+						h.log.Warn(fmt.Sprintf("Dropping the event %s from %s, daily limit reached: %s", evts[0].Id, evts[0].Source, err))
 					}
 				}()
 			default:
@@ -200,6 +200,19 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 				)
 			}
 		}
+	}
+	return
+}
+
+func (h msgHandler) retryWriteRejectedEvent(w modelAwk.Writer[*pb.CloudEvent], evts []*pb.CloudEvent) (err error) {
+	var ackCount uint32
+	ackCount, err = w.WriteBatch(evts)
+	if err == nil && ackCount < 1 {
+		err = errNoAck // it's an error to retry
+	}
+	if !errors.Is(err, limits.ErrReached) {
+		h.log.Debug(fmt.Sprintf("Dropping the rejected event %s from %s, cause: %s", evts[0].Id, evts[0].Source, err))
+		err = nil // stop retrying
 	}
 	return
 }
