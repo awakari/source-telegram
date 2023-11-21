@@ -41,6 +41,8 @@ const (
 
 const attrValType = "com.github.awakari.source-telegram"
 const attrValSpecVersion = "1.0"
+const attrKeyLatitude = "latitude"
+const attrKeyLongitude = "longitude"
 const attrKeyMsgId = "tgmessageid"
 
 // file attrs
@@ -144,6 +146,9 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 		doc := content.(*client.MessageDocument)
 		convertDocument(doc.Document, evt)
 		convertText(doc.Caption, evt)
+	case client.TypeMessageLocation:
+		loc := content.(*client.MessageLocation)
+		convertLocation(loc.Location, evt)
 	case client.TypeMessagePhoto:
 		img := content.(*client.MessagePhoto)
 		convertImage(img.Photo.Sizes[0], evt)
@@ -262,6 +267,19 @@ func convertDocument(doc *client.Document, evt *pb.CloudEvent) {
 	evt.Attributes[attrKeyFileType] = &pb.CloudEventAttributeValue{
 		Attr: &pb.CloudEventAttributeValue_CeInteger{
 			CeInteger: int32(FileTypeDocument),
+		},
+	}
+}
+
+func convertLocation(loc *client.Location, evt *pb.CloudEvent) {
+	evt.Attributes[attrKeyLatitude] = &pb.CloudEventAttributeValue{
+		Attr: &pb.CloudEventAttributeValue_CeString{
+			CeString: fmt.Sprintf("%f", loc.Latitude),
+		},
+	}
+	evt.Attributes[attrKeyLongitude] = &pb.CloudEventAttributeValue{
+		Attr: &pb.CloudEventAttributeValue_CeString{
+			CeString: fmt.Sprintf("%f", loc.Longitude),
 		},
 	}
 }
