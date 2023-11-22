@@ -193,7 +193,7 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 					}
 				}()
 			default:
-				b.MaxElapsedTime = 100 * time.Second
+				b.MaxElapsedTime = 10 * time.Second
 				err = backoff.RetryNotify(
 					func() error {
 						return h.tryWriteEventOnce(w, evts)
