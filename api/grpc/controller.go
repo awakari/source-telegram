@@ -4,18 +4,19 @@ import (
 	"context"
 	"errors"
 	"github.com/awakari/source-telegram/model"
+	"github.com/awakari/source-telegram/service"
 	"github.com/awakari/source-telegram/storage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type controller struct {
-	stor storage.Storage
+	svc service.Service
 }
 
-func NewController(stor storage.Storage) ServiceServer {
+func NewController(svc service.Service) ServiceServer {
 	return controller{
-		stor: stor,
+		svc: svc,
 	}
 }
 
@@ -32,7 +33,7 @@ func (c controller) Create(ctx context.Context, req *CreateRequest) (resp *Creat
 			Name:    req.Channel.Name,
 			Link:    req.Channel.Link,
 		}
-		err = c.stor.Create(ctx, ch)
+		err = c.svc.Create(ctx, ch)
 		err = encodeError(err)
 	}
 	return
@@ -41,7 +42,7 @@ func (c controller) Create(ctx context.Context, req *CreateRequest) (resp *Creat
 func (c controller) Read(ctx context.Context, req *ReadRequest) (resp *ReadResponse, err error) {
 	resp = &ReadResponse{}
 	var ch model.Channel
-	ch, err = c.stor.Read(ctx, req.Link)
+	ch, err = c.svc.Read(ctx, req.Link)
 	switch err {
 	case nil:
 		resp.Channel = &Channel{
@@ -59,7 +60,7 @@ func (c controller) Read(ctx context.Context, req *ReadRequest) (resp *ReadRespo
 
 func (c controller) Delete(ctx context.Context, req *DeleteRequest) (resp *DeleteResponse, err error) {
 	resp = &DeleteResponse{}
-	err = c.stor.Delete(ctx, req.Link)
+	err = c.svc.Delete(ctx, req.Link)
 	err = encodeError(err)
 	return
 }
@@ -72,7 +73,7 @@ func (c controller) List(ctx context.Context, req *ListRequest) (resp *ListRespo
 		filter.UserId = req.Filter.UserId
 	}
 	var page []model.Channel
-	page, err = c.stor.GetPage(ctx, filter, req.Limit, req.Cursor)
+	page, err = c.svc.GetPage(ctx, filter, req.Limit, req.Cursor)
 	if len(page) > 0 {
 		for _, ch := range page {
 			resp.Page = append(resp.Page, &Channel{

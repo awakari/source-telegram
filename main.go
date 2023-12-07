@@ -148,7 +148,7 @@ func main() {
 	//}()
 
 	log.Info(fmt.Sprintf("starting to listen the API @ port #%d...", cfg.Api.Port))
-	go apiGrpc.Serve(stor, cfg.Api.Port)
+	go apiGrpc.Serve(svc, cfg.Api.Port)
 
 	//
 	listener := clientTg.GetListener()

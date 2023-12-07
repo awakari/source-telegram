@@ -2,7 +2,7 @@ package grpc
 
 import (
 	"fmt"
-	"github.com/awakari/source-telegram/storage"
+	"github.com/awakari/source-telegram/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
@@ -10,9 +10,9 @@ import (
 	"net"
 )
 
-func Serve(stor storage.Storage, port uint16) (err error) {
+func Serve(svc service.Service, port uint16) (err error) {
 	srv := grpc.NewServer()
-	c := NewController(stor)
+	c := NewController(svc)
 	RegisterServiceServer(srv, c)
 	reflection.Register(srv)
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())
