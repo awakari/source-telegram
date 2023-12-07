@@ -130,15 +130,7 @@ func main() {
 	chansJoined := map[int64]model.Channel{}
 	chansJoinedLock := &sync.Mutex{}
 
-	svc := service.Service{
-		ClientTg:        clientTg,
-		Storage:         stor,
-		ChansJoined:     chansJoined,
-		ChansJoinedLock: chansJoinedLock,
-		ReplicaRange:    cfg.Replica.Range,
-		ReplicaIndex:    replicaIndex,
-		Log:             log,
-	}
+	svc := service.NewService(clientTg, stor, chansJoined, chansJoinedLock, cfg.Replica.Range, replicaIndex, log)
 	go func() {
 		b := backoff.NewExponentialBackOff()
 		_ = backoff.RetryNotify(svc.RefreshJoinedLoop, b, func(err error, d time.Duration) {

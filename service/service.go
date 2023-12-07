@@ -11,23 +11,84 @@ import (
 	"time"
 )
 
-type Service struct {
-	ClientTg        *client.Client
-	Storage         storage.Storage
-	ChansJoined     map[int64]model.Channel
-	ChansJoinedLock *sync.Mutex
-	ReplicaRange    uint32
-	ReplicaIndex    uint32
-	Log             *slog.Logger
+type Service interface {
+	Create(ctx context.Context, ch model.Channel) (err error)
+	Read(ctx context.Context, link string) (ch model.Channel, err error)
+	Delete(ctx context.Context, link string) (err error)
+	GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error)
+
+	RefreshJoinedLoop() (err error)
+}
+
+type service struct {
+	clientTg        *client.Client
+	stor            storage.Storage
+	chansJoined     map[int64]model.Channel
+	chansJoinedLock *sync.Mutex
+	replicaRange    uint32
+	replicaIndex    uint32
+	log             *slog.Logger
 }
 
 const ListLimit = 1_000
 const RefreshInterval = 5 * time.Minute
 
-func (svc Service) RefreshJoinedLoop() (err error) {
+func NewService(
+	clientTg *client.Client,
+	stor storage.Storage,
+	chansJoined map[int64]model.Channel,
+	chansJoinedLock *sync.Mutex,
+	replicaRange uint32,
+	replicaIndex uint32,
+	log *slog.Logger,
+) Service {
+	return service{
+		clientTg:        clientTg,
+		stor:            stor,
+		chansJoined:     chansJoined,
+		chansJoinedLock: chansJoinedLock,
+		replicaRange:    replicaRange,
+		replicaIndex:    replicaIndex,
+		log:             log,
+	}
+}
+
+func (svc service) Create(ctx context.Context, ch model.Channel) (err error) {
+	var newChat *client.Chat
+	newChat, err = svc.clientTg.SearchPublicChat(&client.SearchPublicChatRequest{
+		Username: ch.Link,
+	})
+	if err == nil {
+		if ch.Id == 0 {
+			ch.Id = newChat.Id
+		}
+		if ch.Name != newChat.Title {
+			ch.Name = newChat.Title
+		}
+		err = svc.stor.Create(ctx, ch)
+	}
+	return
+}
+
+func (svc service) Read(ctx context.Context, link string) (ch model.Channel, err error) {
+	ch, err = svc.stor.Read(ctx, link)
+	return
+}
+
+func (svc service) Delete(ctx context.Context, link string) (err error) {
+	err = svc.stor.Delete(ctx, link)
+	return
+}
+
+func (svc service) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error) {
+	page, err = svc.stor.GetPage(ctx, filter, limit, cursor)
+	return
+}
+
+func (svc service) RefreshJoinedLoop() (err error) {
 	ctx := context.TODO()
 	for err == nil {
-		err = svc.RefreshJoined(ctx)
+		err = svc.refreshJoined(ctx)
 		if err == nil {
 			time.Sleep(RefreshInterval)
 		}
@@ -35,24 +96,24 @@ func (svc Service) RefreshJoinedLoop() (err error) {
 	return
 }
 
-func (svc Service) RefreshJoined(ctx context.Context) (err error) {
-	svc.Log.Debug("Refresh joined channels started")
-	defer svc.Log.Debug("Refresh joined channels finished")
+func (svc service) refreshJoined(ctx context.Context) (err error) {
+	svc.log.Debug("Refresh joined channels started")
+	defer svc.log.Debug("Refresh joined channels finished")
 	// get all previously joined by the client chats
 	var chatsJoined *client.Chats
-	chatsJoined, err = svc.ClientTg.GetChats(&client.GetChatsRequest{Limit: ListLimit})
+	chatsJoined, err = svc.clientTg.GetChats(&client.GetChatsRequest{Limit: ListLimit})
 	var chans []model.Channel
 	if err == nil {
-		svc.Log.Debug(fmt.Sprintf("Refresh joined channels: got %d from the client", len(chatsJoined.ChatIds)))
+		svc.log.Debug(fmt.Sprintf("Refresh joined channels: got %d from the client", len(chatsJoined.ChatIds)))
 		//
 		chanFilter := model.ChannelFilter{
-			IdDiv: svc.ReplicaRange,
-			IdRem: svc.ReplicaIndex,
+			IdDiv: svc.replicaRange,
+			IdRem: svc.replicaIndex,
 		}
-		chans, err = svc.Storage.GetPage(ctx, chanFilter, ListLimit, "") // it's important to get all at once
+		chans, err = svc.stor.GetPage(ctx, chanFilter, ListLimit, "") // it's important to get all at once
 	}
 	if err == nil {
-		svc.Log.Debug(fmt.Sprintf("Refresh joined channels: got %d from the storage", len(chans)))
+		svc.log.Debug(fmt.Sprintf("Refresh joined channels: got %d from the storage", len(chans)))
 		for _, ch := range chans {
 			var joined bool
 			for _, chatJoinedId := range chatsJoined.ChatIds {
@@ -63,15 +124,15 @@ func (svc Service) RefreshJoined(ctx context.Context) (err error) {
 			}
 			if !joined {
 				var newChat *client.Chat
-				newChat, err = svc.ClientTg.SearchPublicChat(&client.SearchPublicChatRequest{
+				newChat, err = svc.clientTg.SearchPublicChat(&client.SearchPublicChatRequest{
 					Username: ch.Link,
 				})
-				svc.Log.Debug(fmt.Sprintf("SearchPublicChat(%s): %+v, %s", ch.Name, newChat, err))
-				_, err = svc.ClientTg.AddRecentlyFoundChat(&client.AddRecentlyFoundChatRequest{
+				svc.log.Debug(fmt.Sprintf("SearchPublicChat(%s): %+v, %s", ch.Name, newChat, err))
+				_, err = svc.clientTg.AddRecentlyFoundChat(&client.AddRecentlyFoundChatRequest{
 					ChatId: ch.Id,
 				})
-				svc.Log.Debug(fmt.Sprintf("AddRecentlyFoundChat(%d): %s", ch.Id, err))
-				_, err = svc.ClientTg.JoinChat(&client.JoinChatRequest{
+				svc.log.Debug(fmt.Sprintf("AddRecentlyFoundChat(%d): %s", ch.Id, err))
+				_, err = svc.clientTg.JoinChat(&client.JoinChatRequest{
 					ChatId: ch.Id,
 				})
 				if err == nil {
@@ -80,10 +141,10 @@ func (svc Service) RefreshJoined(ctx context.Context) (err error) {
 			}
 			switch joined {
 			case true:
-				svc.Log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s", ch.Id, ch.Name))
+				svc.log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s", ch.Id, ch.Name))
 				svc.addJoined(ch)
 			default:
-				svc.Log.Warn(fmt.Sprintf("Failed to join channel by id: %d, cause: %s", ch.Id, err))
+				svc.log.Warn(fmt.Sprintf("Failed to join channel by id: %d, cause: %s", ch.Id, err))
 				err = nil
 			}
 		}
@@ -91,8 +152,8 @@ func (svc Service) RefreshJoined(ctx context.Context) (err error) {
 	return
 }
 
-func (svc Service) addJoined(ch model.Channel) {
-	svc.ChansJoinedLock.Lock()
-	defer svc.ChansJoinedLock.Unlock()
-	svc.ChansJoined[ch.Id] = ch
+func (svc service) addJoined(ch model.Channel) {
+	svc.chansJoinedLock.Lock()
+	defer svc.chansJoinedLock.Unlock()
+	svc.chansJoined[ch.Id] = ch
 }
