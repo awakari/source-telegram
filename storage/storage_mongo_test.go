@@ -285,8 +285,8 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			cursor: fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-ids[3], 10)),
 			order:  model.OrderDesc,
 			page: []int64{
-				ids[1],
 				ids[2],
+				ids[1],
 			},
 		},
 		"end of results": {

@@ -49,7 +49,7 @@ func (s serviceMock) Delete(ctx context.Context, link string) (err error) {
 	return
 }
 
-func (s serviceMock) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error) {
+func (s serviceMock) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error) {
 	switch cursor {
 	case "":
 		page = []model.Channel{

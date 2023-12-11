@@ -1,4 +1,4 @@
-FROM alpine:3.18.3
+FROM alpine:3.19.0
 
 ENV LANG en_US.UTF-8
 ENV TZ UTC
