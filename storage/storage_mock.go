@@ -52,18 +52,32 @@ func (s storageMock) Delete(ctx context.Context, link string) (err error) {
 	return
 }
 
-func (s storageMock) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error) {
+func (s storageMock) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error) {
 	switch cursor {
 	case "":
-		page = []model.Channel{
-			{
-				Name: "channel0",
-				Link: "https://t.me/channel0",
-			},
-			{
-				Name: "channel1",
-				Link: "https://t.me/c/1/2",
-			},
+		switch order {
+		case model.OrderDesc:
+			page = []model.Channel{
+				{
+					Name: "channel1",
+					Link: "https://t.me/c/1/2",
+				},
+				{
+					Name: "channel0",
+					Link: "https://t.me/channel0",
+				},
+			}
+		default:
+			page = []model.Channel{
+				{
+					Name: "channel0",
+					Link: "https://t.me/channel0",
+				},
+				{
+					Name: "channel1",
+					Link: "https://t.me/c/1/2",
+				},
+			}
 		}
 	}
 	return

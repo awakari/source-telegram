@@ -35,6 +35,12 @@ message ListRequest {
   uint32 limit = 1;
   string cursor = 2;
   Filter filter = 3;
+  Order order = 4;
+}
+
+enum Order {
+  ASC = 0;
+  DESC = 1;
 }
 
 message ListResponse {

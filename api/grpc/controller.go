@@ -72,8 +72,15 @@ func (c controller) List(ctx context.Context, req *ListRequest) (resp *ListRespo
 		filter.GroupId = req.Filter.GroupId
 		filter.UserId = req.Filter.UserId
 	}
+	var order model.Order
+	switch req.Order {
+	case Order_DESC:
+		order = model.OrderDesc
+	default:
+		order = model.OrderAsc
+	}
 	var page []model.Channel
-	page, err = c.svc.GetPage(ctx, filter, req.Limit, req.Cursor)
+	page, err = c.svc.GetPage(ctx, filter, req.Limit, req.Cursor, order)
 	if len(page) > 0 {
 		for _, ch := range page {
 			resp.Page = append(resp.Page, &Channel{

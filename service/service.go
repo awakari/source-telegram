@@ -15,7 +15,7 @@ type Service interface {
 	Create(ctx context.Context, ch model.Channel) (err error)
 	Read(ctx context.Context, link string) (ch model.Channel, err error)
 	Delete(ctx context.Context, link string) (err error)
-	GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error)
+	GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error)
 
 	RefreshJoinedLoop() (err error)
 }
@@ -80,8 +80,8 @@ func (svc service) Delete(ctx context.Context, link string) (err error) {
 	return
 }
 
-func (svc service) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error) {
-	page, err = svc.stor.GetPage(ctx, filter, limit, cursor)
+func (svc service) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error) {
+	page, err = svc.stor.GetPage(ctx, filter, limit, cursor, order)
 	return
 }
 
@@ -110,7 +110,7 @@ func (svc service) refreshJoined(ctx context.Context) (err error) {
 			IdDiv: svc.replicaRange,
 			IdRem: svc.replicaIndex,
 		}
-		chans, err = svc.stor.GetPage(ctx, chanFilter, ListLimit, "") // it's important to get all at once
+		chans, err = svc.stor.GetPage(ctx, chanFilter, ListLimit, "", model.OrderAsc) // it's important to get all at once
 	}
 	if err == nil {
 		svc.log.Debug(fmt.Sprintf("Refresh joined channels: got %d from the storage", len(chans)))

@@ -59,10 +59,16 @@ var projGet = bson.D{
 		Value: 1,
 	},
 }
-var sortGetBatch = bson.D{
+var sortGetBatchAsc = bson.D{
 	{
 		Key:   attrLink,
 		Value: 1,
+	},
+}
+var sortGetBatchDesc = bson.D{
+	{
+		Key:   attrLink,
+		Value: -1,
 	},
 }
 var indices = []mongo.IndexModel{
@@ -182,13 +188,8 @@ func (sm storageMongo) Delete(ctx context.Context, link string) (err error) {
 	return
 }
 
-func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error) {
+func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error) {
 	q := bson.M{}
-	if cursor != "" {
-		q[attrLink] = bson.M{
-			"$gt": cursor,
-		}
-	}
 	if filter.IdDiv != 0 {
 		q[attrId] = bson.M{
 			"$mod": bson.A{
@@ -205,8 +206,23 @@ func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, 
 		Find().
 		SetLimit(int64(limit)).
 		SetShowRecordID(false).
-		SetSort(sortGetBatch).
 		SetProjection(projGet)
+	switch order {
+	case model.OrderDesc:
+		if cursor != "" {
+			q[attrLink] = bson.M{
+				"$lt": cursor,
+			}
+		}
+		optsList = optsList.SetSort(sortGetBatchDesc)
+	default:
+		if cursor != "" {
+			q[attrLink] = bson.M{
+				"$gt": cursor,
+			}
+		}
+		optsList = optsList.SetSort(sortGetBatchAsc)
+	}
 	var cur *mongo.Cursor
 	cur, err = sm.coll.Find(ctx, q, optsList)
 	if err == nil {

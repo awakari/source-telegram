@@ -244,6 +244,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 		filter model.ChannelFilter
 		limit  uint32
 		cursor string
+		order  model.Order
 		page   []int64
 		err    error
 	}{
@@ -270,13 +271,22 @@ func TestStorageMongo_GetPage(t *testing.T) {
 				ids[1],
 			},
 		},
-		"cursor": {
+		"cursor asc": {
 			limit:  10,
 			cursor: fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-ids[1], 10)),
 			page: []int64{
 				ids[2],
 				ids[3],
 				ids[4],
+			},
+		},
+		"cursor desc limit = 2": {
+			limit:  2,
+			cursor: fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-ids[3], 10)),
+			order:  model.OrderDesc,
+			page: []int64{
+				ids[2],
+				ids[1],
 			},
 		},
 		"end of results": {
@@ -288,7 +298,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 	for k, c := range cases {
 		t.Run(k, func(t *testing.T) {
 			var page []model.Channel
-			page, err = s.GetPage(ctx, c.filter, c.limit, c.cursor)
+			page, err = s.GetPage(ctx, c.filter, c.limit, c.cursor, c.order)
 			assert.Equal(t, len(c.page), len(page))
 			for i, ch := range page {
 				assert.Equal(t, strconv.FormatInt(c.page[i], 10), ch.Name)

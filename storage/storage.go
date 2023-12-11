@@ -12,7 +12,7 @@ type Storage interface {
 	Create(ctx context.Context, ch model.Channel) (err error)
 	Read(ctx context.Context, link string) (ch model.Channel, err error)
 	Delete(ctx context.Context, link string) (err error)
-	GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error)
+	GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error)
 }
 
 var ErrNotFound = errors.New("channel not found")

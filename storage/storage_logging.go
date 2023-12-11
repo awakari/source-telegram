@@ -47,10 +47,10 @@ func (sl storageLogging) Delete(ctx context.Context, link string) (err error) {
 	return
 }
 
-func (sl storageLogging) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string) (page []model.Channel, err error) {
-	page, err = sl.stor.GetPage(ctx, filter, limit, cursor)
+func (sl storageLogging) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error) {
+	page, err = sl.stor.GetPage(ctx, filter, limit, cursor, order)
 	ll := sl.logLevel(err)
-	sl.log.Log(ctx, ll, fmt.Sprintf("storage.GetPage(filter=%+v, limit=%d, cursor=%s): %d, %s", filter, limit, cursor, len(page), err))
+	sl.log.Log(ctx, ll, fmt.Sprintf("storage.GetPage(filter=%+v, limit=%d, cursor=%s, order=%s): %d, %s", filter, limit, cursor, order, len(page), err))
 	return
 }
 
