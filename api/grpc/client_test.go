@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"github.com/awakari/source-telegram/storage"
+	"github.com/awakari/source-telegram/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -20,9 +20,9 @@ var port uint16 = 50051
 var log = slog.Default()
 
 func TestMain(m *testing.M) {
-	stor := storage.NewStorageMock()
+	svc := service.NewServiceMock()
 	go func() {
-		err := Serve(stor, port)
+		err := Serve(svc, port)
 		if err != nil {
 			log.Error("", err)
 		}
