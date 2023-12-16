@@ -207,21 +207,37 @@ func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, 
 		SetLimit(int64(limit)).
 		SetShowRecordID(false).
 		SetProjection(projGet)
+	var clauseCursor bson.M
 	switch order {
 	case model.OrderDesc:
-		if cursor != "" {
-			q[attrLink] = bson.M{
-				"$lt": cursor,
-			}
+		clauseCursor = bson.M{
+			"$lt": cursor,
 		}
 		optsList = optsList.SetSort(sortGetBatchDesc)
 	default:
-		if cursor != "" {
-			q[attrLink] = bson.M{
-				"$gt": cursor,
-			}
+		clauseCursor = bson.M{
+			"$gt": cursor,
 		}
 		optsList = optsList.SetSort(sortGetBatchAsc)
+	}
+	q["$and"] = []bson.M{
+		{
+			attrLink: clauseCursor,
+		},
+		{
+			"$or": []bson.M{
+				{
+					attrLink: bson.M{
+						"$regex": filter.Pattern,
+					},
+				},
+				{
+					attrName: bson.M{
+						"$regex": filter.Pattern,
+					},
+				},
+			},
+		},
 	}
 	var cur *mongo.Cursor
 	cur, err = sm.coll.Find(ctx, q, optsList)

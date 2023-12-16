@@ -58,4 +58,5 @@ message Channel {
 message Filter {
   string groupId = 1;
   string userId = 2;
+  string pattern = 3;
 }

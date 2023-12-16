@@ -252,6 +252,17 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			limit: 10,
 			page:  ids,
 		},
+		"filter w/ pattern": {
+			filter: model.ChannelFilter{
+				Pattern: "7",
+			},
+			limit: 10,
+			page: []int64{
+				ids[0],
+				ids[2],
+				ids[3],
+			},
+		},
 		"filter": {
 			filter: model.ChannelFilter{
 				IdDiv: 2,

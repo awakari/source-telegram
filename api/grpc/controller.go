@@ -71,6 +71,7 @@ func (c controller) List(ctx context.Context, req *ListRequest) (resp *ListRespo
 	if req.Filter != nil {
 		filter.GroupId = req.Filter.GroupId
 		filter.UserId = req.Filter.UserId
+		filter.Pattern = req.Filter.Pattern
 	}
 	var order model.Order
 	switch req.Order {
