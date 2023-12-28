@@ -70,7 +70,7 @@ func main() {
 		ApplicationVersion: "1.0.0",
 	}
 	_, err = client.SetLogVerbosityLevel(&client.SetLogVerbosityLevelRequest{
-		NewVerbosityLevel: 1,
+		NewVerbosityLevel: 2,
 	})
 	if err != nil {
 		panic(err)
