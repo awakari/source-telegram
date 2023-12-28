@@ -7,6 +7,8 @@ import (
 	"github.com/akurilov/go-tdlib/client"
 	"github.com/awakari/client-sdk-go/api"
 	"github.com/awakari/client-sdk-go/api/grpc/limits"
+	"github.com/awakari/client-sdk-go/api/grpc/permits"
+	"github.com/awakari/client-sdk-go/api/grpc/resolver"
 	modelAwk "github.com/awakari/client-sdk-go/model"
 	"github.com/awakari/source-telegram/handler"
 	"github.com/awakari/source-telegram/model"
@@ -14,6 +16,7 @@ import (
 	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/metadata"
+	"io"
 	"log/slog"
 	"strconv"
 	"sync"
@@ -74,38 +77,23 @@ func NewHandler(
 
 func (h msgHandler) Handle(msg *client.Message) (err error) {
 	chanId := msg.ChatId
-	var w modelAwk.Writer[*pb.CloudEvent]
-	w, ok := h.writers[chanId]
-	if !ok {
-		h.log.Debug(fmt.Sprintf("Writer not found for channel id = %d", chanId))
-		var ch model.Channel
-		//
-		h.chansJoinedLock.Lock()
-		ch, ok = h.chansJoined[chanId]
-		h.chansJoinedLock.Unlock()
-		//
-		switch ok {
-		case true:
-			ctxGroupId := metadata.AppendToOutgoingContext(context.TODO(), "x-awakari-group-id", ch.GroupId)
-			userId := ch.UserId
-			if userId == "" {
-				userId = ch.Link
-			}
-			w, err = h.clientAwk.OpenMessagesWriter(ctxGroupId, userId)
-			if err == nil {
-				h.log.Debug(fmt.Sprintf("New message writer is open for chanId=%d, groupId=%s, userId=%s", chanId, ch.GroupId, userId))
-				h.writers[chanId] = w
-			}
-		default:
-			h.log.Debug(fmt.Sprintf("No channel joined found for id = %d", chanId))
-		}
-	}
-	if w != nil {
-		err = h.handleMessage(w, msg)
+	evt := h.convertToEvent(msg)
+	if err == nil {
+		err = h.getWriterAndPublish(chanId, evt)
 		if err != nil {
-			h.log.Warn(fmt.Sprintf("Message handle failure, closing the writer: %s", err))
-			_ = w.Close()
-			delete(h.writers, chanId)
+			// retry with a backoff
+			b := backoff.NewExponentialBackOff()
+			b.InitialInterval = 100 * time.Millisecond
+			b.MaxElapsedTime = 10 * time.Second
+			err = backoff.RetryNotify(
+				func() error {
+					return h.getWriterAndPublish(chanId, evt)
+				},
+				b,
+				func(err error, d time.Duration) {
+					h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
+				},
+			)
 		}
 	}
 	return
@@ -119,9 +107,8 @@ func (h msgHandler) Close() (err error) {
 	return
 }
 
-func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client.Message) (err error) {
-	//
-	evt := &pb.CloudEvent{
+func (h msgHandler) convertToEvent(msg *client.Message) (evt *pb.CloudEvent) {
+	evt = &pb.CloudEvent{
 		Id:          uuid.NewString(),
 		SpecVersion: attrValSpecVersion,
 		Type:        attrValType,
@@ -133,9 +120,7 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 			},
 		},
 	}
-	//
 	h.convertSource(msg, evt)
-	//
 	content := msg.Content
 	switch content.MessageContentType() {
 	case client.TypeMessageAudio:
@@ -163,71 +148,7 @@ func (h msgHandler) handleMessage(w modelAwk.Writer[*pb.CloudEvent], msg *client
 	default:
 		h.log.Info(fmt.Sprintf("unsupported message content type: %s\n", content.MessageContentType()))
 	}
-	//
-	if evt.Data != nil {
-		h.log.Debug(fmt.Sprintf("New message %d from chat %d: converted to event id: %s, source: %s\n", msg.Id, msg.ChatId, evt.Id, evt.Source))
-		evts := []*pb.CloudEvent{
-			evt,
-		}
-		err = h.tryWriteEventOnce(w, evts)
-		if err != nil {
-			// retry with a backoff
-			b := backoff.NewExponentialBackOff()
-			b.InitialInterval = 100 * time.Millisecond
-			switch {
-			case errors.Is(err, limits.ErrReached):
-				// spawn a shorter backoff just in case if the ResourceExhausted status is spurious, don't block
-				b.MaxElapsedTime = 1 * time.Second
-				go func() {
-					err = backoff.RetryNotify(
-						func() error {
-							return h.retryWriteRejectedEvent(w, evts)
-						},
-						b,
-						func(err error, d time.Duration) {
-							h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
-						},
-					)
-					if err != nil {
-						h.log.Warn(fmt.Sprintf("Dropping the event %s from %s, daily limit reached: %s", evts[0].Id, evts[0].Source, err))
-					}
-				}()
-			default:
-				b.MaxElapsedTime = 10 * time.Second
-				err = backoff.RetryNotify(
-					func() error {
-						return h.tryWriteEventOnce(w, evts)
-					},
-					b,
-					func(err error, d time.Duration) {
-						h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
-					},
-				)
-			}
-		}
-	}
-	return
-}
-
-func (h msgHandler) retryWriteRejectedEvent(w modelAwk.Writer[*pb.CloudEvent], evts []*pb.CloudEvent) (err error) {
-	var ackCount uint32
-	ackCount, err = w.WriteBatch(evts)
-	if err == nil && ackCount < 1 {
-		err = errNoAck // it's an error to retry
-	}
-	if !errors.Is(err, limits.ErrReached) {
-		h.log.Debug(fmt.Sprintf("Dropping the rejected event %s from %s, cause: %s", evts[0].Id, evts[0].Source, err))
-		err = nil // stop retrying
-	}
-	return
-}
-
-func (h msgHandler) tryWriteEventOnce(w modelAwk.Writer[*pb.CloudEvent], evts []*pb.CloudEvent) (err error) {
-	var ackCount uint32
-	ackCount, err = w.WriteBatch(evts)
-	if err == nil && ackCount < 1 {
-		err = errNoAck // it's an error to retry
-	}
+	h.log.Debug(fmt.Sprintf("New message %d from chat %d: converted to event id: %s, source: %s\n", msg.Id, msg.ChatId, evt.Id, evt.Source))
 	return
 }
 
@@ -346,4 +267,128 @@ func convertFile(f *client.File, evt *pb.CloudEvent) {
 			},
 		}
 	}
+}
+
+func (h msgHandler) getWriterAndPublish(chanId int64, evt *pb.CloudEvent) (err error) {
+	var w modelAwk.Writer[*pb.CloudEvent]
+	w, err = h.getWriter(chanId)
+	if err == nil {
+		err = h.publish(w, evt)
+		switch {
+		case err == nil:
+		case errors.Is(err, limits.ErrUnavailable):
+			fallthrough
+		case errors.Is(err, permits.ErrUnavailable):
+			fallthrough
+		case errors.Is(err, resolver.ErrUnavailable):
+			fallthrough
+		case errors.Is(err, io.EOF):
+			h.log.Warn(fmt.Sprintf("Closing the failing writer stream for channeld %d before retrying, cause: %s", chanId, err))
+			h.chansJoinedLock.Lock()
+			defer h.chansJoinedLock.Unlock()
+			_ = w.Close()
+			delete(h.writers, chanId)
+		default:
+			h.log.Error(fmt.Sprintf("Failed to publish event %s from channel %d, cause: %s", evt.Id, chanId, err))
+		}
+	}
+	return
+}
+
+func (h msgHandler) getWriter(chanId int64) (w modelAwk.Writer[*pb.CloudEvent], err error) {
+	h.chansJoinedLock.Lock()
+	defer h.chansJoinedLock.Unlock()
+	var ok bool
+	w, ok = h.writers[chanId]
+	if !ok {
+		h.log.Debug(fmt.Sprintf("Writer not found for channel id = %d", chanId))
+		var ch model.Channel
+		ch, ok = h.chansJoined[chanId]
+		switch ok {
+		case true:
+			ctxGroupId := metadata.AppendToOutgoingContext(context.TODO(), "x-awakari-group-id", ch.GroupId)
+			userId := ch.UserId
+			if userId == "" {
+				userId = ch.Link
+			}
+			w, err = h.clientAwk.OpenMessagesWriter(ctxGroupId, userId)
+			if err == nil {
+				h.log.Debug(fmt.Sprintf("New message writer is open for chanId=%d, groupId=%s, userId=%s", chanId, ch.GroupId, userId))
+				h.writers[chanId] = w
+			}
+		default:
+			h.log.Debug(fmt.Sprintf("No joined channel found for id = %d", chanId))
+		}
+		h.chansJoinedLock.Unlock()
+	}
+	return
+}
+
+func (h msgHandler) publish(w modelAwk.Writer[*pb.CloudEvent], evt *pb.CloudEvent) (err error) {
+	if evt.Data != nil {
+		evts := []*pb.CloudEvent{
+			evt,
+		}
+		err = h.tryWriteEventOnce(w, evts)
+		if err != nil {
+			// retry with a backoff
+			b := backoff.NewExponentialBackOff()
+			b.InitialInterval = 100 * time.Millisecond
+			switch {
+			case errors.Is(err, limits.ErrReached):
+				// spawn a shorter backoff just in case if the ResourceExhausted status is spurious, don't block
+				b.MaxElapsedTime = 1 * time.Second
+				go func() {
+					err = backoff.RetryNotify(
+						func() error {
+							return h.retryWriteRejectedEvent(w, evts)
+						},
+						b,
+						func(err error, d time.Duration) {
+							h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
+						},
+					)
+					if err != nil {
+						h.log.Warn(fmt.Sprintf("Dropping the event %s from %s, daily limit reached: %s", evts[0].Id, evts[0].Source, err))
+					}
+				}()
+			case errors.Is(err, limits.ErrUnavailable) || errors.Is(err, permits.ErrUnavailable) || errors.Is(err, resolver.ErrUnavailable):
+				// avoid retrying this before reopening the writer
+			default:
+				b.MaxElapsedTime = 10 * time.Second
+				err = backoff.RetryNotify(
+					func() error {
+						return h.tryWriteEventOnce(w, evts)
+					},
+					b,
+					func(err error, d time.Duration) {
+						h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
+					},
+				)
+			}
+		}
+	}
+	return
+}
+
+func (h msgHandler) retryWriteRejectedEvent(w modelAwk.Writer[*pb.CloudEvent], evts []*pb.CloudEvent) (err error) {
+	var ackCount uint32
+	ackCount, err = w.WriteBatch(evts)
+	if err == nil && ackCount < 1 {
+		err = errNoAck // it's an error to retry
+	}
+	if !errors.Is(err, limits.ErrReached) {
+		h.log.Debug(fmt.Sprintf("Dropping the rejected event %s from %s, cause: %s", evts[0].Id, evts[0].Source, err))
+		err = nil // stop retrying
+	}
+	return
+}
+
+func (h msgHandler) tryWriteEventOnce(w modelAwk.Writer[*pb.CloudEvent], evts []*pb.CloudEvent) (err error) {
+	var ackCount uint32
+	ackCount, err = w.WriteBatch(evts)
+	if err == nil && ackCount < 1 {
+		err = errNoAck // it's an error to retry
+	}
+	return
 }

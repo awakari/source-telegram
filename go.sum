@@ -1,7 +1,7 @@
 github.com/akurilov/go-tdlib v0.0.1 h1:0DKJ33OOMdiATFovSZzucCqlkfonSPs2spShnQ3WiKw=
 github.com/akurilov/go-tdlib v0.0.1/go.mod h1:WmObZkOdOP6y3i3B9w3xJqfM1V04Pq0UTrNeLEZpgAQ=
-github.com/awakari/client-sdk-go v1.0.7 h1:yd8R51IKZgZ+lnYnbnFFxEddIuLpLbCzTzNpaqQuXuo=
-github.com/awakari/client-sdk-go v1.0.7/go.mod h1:I83Qlnyr/GM/5nVFNX3MIakUC01W21b/YdaK+064rZQ=
+github.com/awakari/client-sdk-go v1.0.9 h1:BC9UnTNuBL+Hgfi5l4fwdCMWnpSfBlPJL+krMOeBFJY=
+github.com/awakari/client-sdk-go v1.0.9/go.mod h1:I83Qlnyr/GM/5nVFNX3MIakUC01W21b/YdaK+064rZQ=
 github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqylYbM=
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cloudevents/sdk-go/binding/format/protobuf/v2 v2.14.0 h1:dEopBSOSjB5fM9r76ufM44AVj9Dnz2IOM0Xs6FVxZRM=
