@@ -3,12 +3,12 @@ entries:
   source-telegram:
   - apiVersion: v2
     appVersion: latest
-    created: "2023-12-28T14:36:54.138016963Z"
+    created: "2023-12-28T15:35:05.096766227Z"
     description: A Helm chart for Awakari Telegram Producer
-    digest: 53fb3b380cab68e418edc75accdeae664d91ee6dd8198003b81468617dc3b458
+    digest: 82c7d699cbdb06b5933beab01e994a297584e773c1a887f8697f4df1f8024247
     name: source-telegram
     type: application
     urls:
     - source-telegram-0.0.0.tgz
     version: 0.0.0
-generated: "2023-12-28T14:36:54.137271667Z"
+generated: "2023-12-28T15:35:05.096006417Z"
