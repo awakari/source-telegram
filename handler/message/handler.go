@@ -319,7 +319,6 @@ func (h msgHandler) getWriter(chanId int64) (w modelAwk.Writer[*pb.CloudEvent], 
 		default:
 			h.log.Debug(fmt.Sprintf("No joined channel found for id = %d", chanId))
 		}
-		h.chansJoinedLock.Unlock()
 	}
 	return
 }
