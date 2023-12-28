@@ -272,7 +272,7 @@ func convertFile(f *client.File, evt *pb.CloudEvent) {
 func (h msgHandler) getWriterAndPublish(chanId int64, evt *pb.CloudEvent) (err error) {
 	var w modelAwk.Writer[*pb.CloudEvent]
 	w, err = h.getWriter(chanId)
-	if err == nil {
+	if w != nil && err == nil {
 		err = h.publish(w, evt)
 		switch {
 		case err == nil:
