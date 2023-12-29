@@ -259,6 +259,7 @@ func (h msgHandler) getWriterAndPublish(chanId int64, evt *pb.CloudEvent) (err e
 		err = h.publish(w, evt)
 		switch {
 		case err == nil:
+		case errors.Is(err, limits.ErrReached):
 		case errors.Is(err, limits.ErrUnavailable):
 			fallthrough
 		case errors.Is(err, permits.ErrUnavailable):
@@ -318,6 +319,7 @@ func (h msgHandler) publish(w modelAwk.Writer[*pb.CloudEvent], evt *pb.CloudEven
 			b.InitialInterval = 100 * time.Millisecond
 			switch {
 			case errors.Is(err, limits.ErrReached):
+				err = nil // avoid the outer retry
 				// spawn a shorter backoff just in case if the ResourceExhausted status is spurious, don't block
 				b.MaxElapsedTime = 1 * time.Second
 				go func() {
