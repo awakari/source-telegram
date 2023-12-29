@@ -12,6 +12,7 @@ import (
 	"github.com/awakari/source-telegram/service"
 	"github.com/awakari/source-telegram/storage"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -23,7 +24,7 @@ import (
 	"github.com/akurilov/go-tdlib/client"
 	"github.com/awakari/client-sdk-go/api"
 	"github.com/cenkalti/backoff/v4"
-	//_ "net/http/pprof"
+	_ "net/http/pprof"
 )
 
 func main() {
@@ -70,7 +71,7 @@ func main() {
 		ApplicationVersion: "1.0.0",
 	}
 	_, err = client.SetLogVerbosityLevel(&client.SetLogVerbosityLevelRequest{
-		NewVerbosityLevel: 2,
+		NewVerbosityLevel: 1,
 	})
 	if err != nil {
 		panic(err)
@@ -143,9 +144,9 @@ func main() {
 	defer msgHandler.Close()
 
 	// expose the profiling
-	//go func() {
-	//	_ = http.ListenAndServe("localhost:6060", nil)
-	//}()
+	go func() {
+		_ = http.ListenAndServe("localhost:6060", nil)
+	}()
 
 	log.Info(fmt.Sprintf("starting to listen the API @ port #%d...", cfg.Api.Port))
 	go apiGrpc.Serve(svc, cfg.Api.Port)

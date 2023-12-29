@@ -77,7 +77,7 @@ func NewHandler(
 
 func (h msgHandler) Handle(msg *client.Message) (err error) {
 	chanId := msg.ChatId
-	evt := h.convertToEvent(msg)
+	evt := h.convertToEvent(chanId, msg)
 	if err == nil {
 		err = h.getWriterAndPublish(chanId, evt)
 		if err != nil {
@@ -107,9 +107,10 @@ func (h msgHandler) Close() (err error) {
 	return
 }
 
-func (h msgHandler) convertToEvent(msg *client.Message) (evt *pb.CloudEvent) {
+func (h msgHandler) convertToEvent(chanId int64, msg *client.Message) (evt *pb.CloudEvent) {
 	evt = &pb.CloudEvent{
 		Id:          uuid.NewString(),
+		Source:      h.chansJoined[chanId].Link,
 		SpecVersion: attrValSpecVersion,
 		Type:        attrValType,
 		Attributes: map[string]*pb.CloudEventAttributeValue{
@@ -120,7 +121,6 @@ func (h msgHandler) convertToEvent(msg *client.Message) (evt *pb.CloudEvent) {
 			},
 		},
 	}
-	h.convertSource(msg, evt)
 	content := msg.Content
 	switch content.MessageContentType() {
 	case client.TypeMessageAudio:
@@ -149,23 +149,6 @@ func (h msgHandler) convertToEvent(msg *client.Message) (evt *pb.CloudEvent) {
 		h.log.Info(fmt.Sprintf("unsupported message content type: %s\n", content.MessageContentType()))
 	}
 	h.log.Debug(fmt.Sprintf("New message %d from chat %d: converted to event id: %s, source: %s\n", msg.Id, msg.ChatId, evt.Id, evt.Source))
-	return
-}
-
-func (h msgHandler) convertSource(msg *client.Message, evt *pb.CloudEvent) {
-	var link *client.MessageLink
-	var err error
-	link, err = h.clientTg.GetMessageLink(&client.GetMessageLinkRequest{
-		ChatId:    msg.ChatId,
-		MessageId: msg.Id,
-	})
-	switch err {
-	case nil:
-		evt.Source = link.Link
-	default:
-		h.log.Warn(fmt.Sprintf("Failed to get the message %d from chat %d link: %s", msg.Id, msg.ChatId, err))
-		evt.Source = strconv.FormatInt(msg.Id, 10)
-	}
 	return
 }
 
