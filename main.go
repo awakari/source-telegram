@@ -60,6 +60,7 @@ func main() {
 	//
 	go client.NonInteractiveCredentialsProvider(authorizer, cfg.Api.Telegram.Phone, cfg.Api.Telegram.Password, chCode)
 	authorizer.TdlibParameters <- &client.SetTdlibParametersRequest{
+		//
 		UseTestDc:          false,
 		UseSecretChats:     false,
 		ApiId:              cfg.Api.Telegram.Id,
@@ -68,6 +69,11 @@ func main() {
 		DeviceModel:        "Awakari",
 		SystemVersion:      "1.0.0",
 		ApplicationVersion: "1.0.0",
+		// db opts
+		UseFileDatabase:        true,
+		UseChatInfoDatabase:    true,
+		UseMessageDatabase:     true,
+		EnableStorageOptimizer: true,
 	}
 	_, err = client.SetLogVerbosityLevel(&client.SetLogVerbosityLevelRequest{
 		NewVerbosityLevel: 1,
