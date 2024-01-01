@@ -24,10 +24,14 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
+podSecurityContext:
+  runAsUser: 0
+  runAsGroup: 0
   # fsGroup: 2000
 
-securityContext: {}
+securityContext:
+  capabilities:
+    add: [ "SYS_PTRACE" ]
   # capabilities:
   #   drop:
   #   - ALL
@@ -55,7 +59,7 @@ resources:
     memory: 16Mi
   limits:
     cpu: 1000m
-    memory: 256Mi
+    memory: 128Mi
 
 autoscaling:
   enabled: true
