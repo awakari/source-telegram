@@ -242,8 +242,8 @@ func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, 
 	var cur *mongo.Cursor
 	cur, err = sm.coll.Find(ctx, q, optsList)
 	if err == nil {
-		var rec recChan
 		for cur.Next(ctx) {
+			var rec recChan
 			err = errors.Join(err, cur.Decode(&rec))
 			if err == nil {
 				page = append(page, model.Channel{
