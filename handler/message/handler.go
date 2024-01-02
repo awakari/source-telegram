@@ -293,6 +293,7 @@ func (h msgHandler) getWriter(chanId int64) (w modelAwk.Writer[*pb.CloudEvent], 
 			ctxGroupId := metadata.AppendToOutgoingContext(context.TODO(), "x-awakari-group-id", ch.GroupId)
 			userId := ch.UserId
 			if userId == "" {
+				h.log.Debug(fmt.Sprintf("Channel %s has no assigned user id, using the channel id instead", ch.Link))
 				userId = ch.Link
 			}
 			w, err = h.clientAwk.OpenMessagesWriter(ctxGroupId, userId)

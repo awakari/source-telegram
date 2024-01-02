@@ -141,7 +141,7 @@ func (svc service) refreshJoined(ctx context.Context) (err error) {
 			}
 			switch joined {
 			case true:
-				svc.log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s", ch.Id, ch.Name))
+				svc.log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s, user: %s", ch.Id, ch.Name, ch.UserId))
 				svc.addJoined(ch)
 			default:
 				svc.log.Warn(fmt.Sprintf("Failed to join channel by id: %d, cause: %s", ch.Id, err))
