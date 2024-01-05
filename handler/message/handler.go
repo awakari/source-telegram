@@ -260,6 +260,7 @@ func (h msgHandler) getWriterAndPublish(chanId int64, evt *pb.CloudEvent) (err e
 		switch {
 		case err == nil:
 		case errors.Is(err, limits.ErrReached):
+			fallthrough
 		case errors.Is(err, limits.ErrUnavailable):
 			fallthrough
 		case errors.Is(err, permits.ErrUnavailable):
@@ -320,24 +321,13 @@ func (h msgHandler) publish(w modelAwk.Writer[*pb.CloudEvent], evt *pb.CloudEven
 			b.InitialInterval = 100 * time.Millisecond
 			switch {
 			case errors.Is(err, limits.ErrReached):
-				err = nil // avoid the outer retry
-				// spawn a shorter backoff just in case if the ResourceExhausted status is spurious, don't block
-				b.MaxElapsedTime = 1 * time.Second
-				go func() {
-					err = backoff.RetryNotify(
-						func() error {
-							return h.retryWriteRejectedEvent(w, evts)
-						},
-						b,
-						func(err error, d time.Duration) {
-							h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
-						},
-					)
-					if err != nil {
-						h.log.Warn(fmt.Sprintf("Dropping the event %s from %s, daily limit reached: %s", evts[0].Id, evts[0].Source, err))
-					}
-				}()
-			case errors.Is(err, limits.ErrUnavailable) || errors.Is(err, permits.ErrUnavailable) || errors.Is(err, resolver.ErrUnavailable):
+				// this error may be due to internal gRPC status "resource exhausted", try to reopen the writer
+				fallthrough
+			case errors.Is(err, limits.ErrUnavailable):
+				fallthrough
+			case errors.Is(err, permits.ErrUnavailable):
+				fallthrough
+			case errors.Is(err, resolver.ErrUnavailable):
 				// avoid retrying this before reopening the writer
 			default:
 				b.MaxElapsedTime = 10 * time.Second
@@ -352,19 +342,6 @@ func (h msgHandler) publish(w modelAwk.Writer[*pb.CloudEvent], evt *pb.CloudEven
 				)
 			}
 		}
-	}
-	return
-}
-
-func (h msgHandler) retryWriteRejectedEvent(w modelAwk.Writer[*pb.CloudEvent], evts []*pb.CloudEvent) (err error) {
-	var ackCount uint32
-	ackCount, err = w.WriteBatch(evts)
-	if err == nil && ackCount < 1 {
-		err = errNoAck // it's an error to retry
-	}
-	if !errors.Is(err, limits.ErrReached) {
-		h.log.Debug(fmt.Sprintf("Dropping the rejected event %s from %s, cause: %s", evts[0].Id, evts[0].Source, err))
-		err = nil // stop retrying
 	}
 	return
 }
