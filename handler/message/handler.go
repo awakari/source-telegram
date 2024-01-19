@@ -263,7 +263,11 @@ func (h msgHandler) getWriterAndPublish(chanId int64, evt *pb.CloudEvent) (err e
 			fallthrough
 		case errors.Is(err, limits.ErrUnavailable):
 			fallthrough
+		case errors.Is(err, limits.ErrInternal):
+			fallthrough
 		case errors.Is(err, permits.ErrUnavailable):
+			fallthrough
+		case errors.Is(err, permits.ErrInternal):
 			fallthrough
 		case errors.Is(err, resolver.ErrUnavailable):
 			fallthrough
