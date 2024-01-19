@@ -332,6 +332,8 @@ func (h msgHandler) publish(w modelAwk.Writer[*pb.CloudEvent], evt *pb.CloudEven
 			case errors.Is(err, permits.ErrUnavailable):
 				fallthrough
 			case errors.Is(err, resolver.ErrUnavailable):
+				fallthrough
+			case errors.Is(err, resolver.ErrInternal):
 				// avoid retrying this before reopening the writer
 			default:
 				b.MaxElapsedTime = 10 * time.Second
@@ -341,7 +343,7 @@ func (h msgHandler) publish(w modelAwk.Writer[*pb.CloudEvent], evt *pb.CloudEven
 					},
 					b,
 					func(err error, d time.Duration) {
-						h.log.Warn(fmt.Sprintf("Failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
+						h.log.Warn(fmt.Sprintf("failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
 					},
 				)
 			}
