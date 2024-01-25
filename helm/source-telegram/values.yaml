@@ -59,14 +59,14 @@ resources:
     memory: 16Mi
   limits:
     cpu: 1000m
-    memory: 128Mi
+    memory: 512Mi
 
 autoscaling:
   enabled: true
   minReplicas: 1
   maxReplicas: 1
   targetCPUUtilizationValue: 1000m
-  targetMemoryUtilizationValue: 128Mi
+  targetMemoryUtilizationValue: 512Mi
 
 nodeSelector: {}
 
