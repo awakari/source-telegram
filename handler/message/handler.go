@@ -78,7 +78,7 @@ func NewHandler(
 func (h msgHandler) Handle(msg *client.Message) (err error) {
 	chanId := msg.ChatId
 	evt := h.convertToEvent(chanId, msg)
-	if err == nil {
+	if err == nil && evt != nil {
 		err = h.getWriterAndPublish(chanId, evt)
 		if err != nil {
 			// retry with a backoff
@@ -108,47 +108,51 @@ func (h msgHandler) Close() (err error) {
 }
 
 func (h msgHandler) convertToEvent(chanId int64, msg *client.Message) (evt *pb.CloudEvent) {
-	evt = &pb.CloudEvent{
-		Id:          uuid.NewString(),
-		Source:      h.chansJoined[chanId].Link,
-		SpecVersion: attrValSpecVersion,
-		Type:        attrValType,
-		Attributes: map[string]*pb.CloudEventAttributeValue{
-			attrKeyMsgId: {
-				Attr: &pb.CloudEventAttributeValue_CeString{
-					CeString: strconv.FormatInt(msg.Id, 10),
+	if msg != nil {
+		content := msg.Content
+		if content != nil {
+			evt = &pb.CloudEvent{
+				Id:          uuid.NewString(),
+				Source:      h.chansJoined[chanId].Link,
+				SpecVersion: attrValSpecVersion,
+				Type:        attrValType,
+				Attributes: map[string]*pb.CloudEventAttributeValue{
+					attrKeyMsgId: {
+						Attr: &pb.CloudEventAttributeValue_CeString{
+							CeString: strconv.FormatInt(msg.Id, 10),
+						},
+					},
 				},
-			},
-		},
+			}
+			switch content.MessageContentType() {
+			case client.TypeMessageAudio:
+				a := content.(*client.MessageAudio)
+				convertAudio(a.Audio, evt)
+				convertText(a.Caption, evt)
+			case client.TypeMessageDocument:
+				doc := content.(*client.MessageDocument)
+				convertDocument(doc.Document, evt)
+				convertText(doc.Caption, evt)
+			case client.TypeMessageLocation:
+				loc := content.(*client.MessageLocation)
+				convertLocation(loc.Location, evt)
+			case client.TypeMessagePhoto:
+				img := content.(*client.MessagePhoto)
+				convertImage(img.Photo.Sizes[0], evt)
+				convertText(img.Caption, evt)
+			case client.TypeMessageText:
+				txt := content.(*client.MessageText)
+				convertText(txt.Text, evt)
+			case client.TypeMessageVideo:
+				v := content.(*client.MessageVideo)
+				convertVideo(v.Video, evt)
+				convertText(v.Caption, evt)
+			default:
+				h.log.Info(fmt.Sprintf("unsupported message content type: %s\n", content.MessageContentType()))
+			}
+			h.log.Debug(fmt.Sprintf("New message %d from chat %d: converted to event id: %s, source: %s\n", msg.Id, msg.ChatId, evt.Id, evt.Source))
+		}
 	}
-	content := msg.Content
-	switch content.MessageContentType() {
-	case client.TypeMessageAudio:
-		a := content.(*client.MessageAudio)
-		convertAudio(a.Audio, evt)
-		convertText(a.Caption, evt)
-	case client.TypeMessageDocument:
-		doc := content.(*client.MessageDocument)
-		convertDocument(doc.Document, evt)
-		convertText(doc.Caption, evt)
-	case client.TypeMessageLocation:
-		loc := content.(*client.MessageLocation)
-		convertLocation(loc.Location, evt)
-	case client.TypeMessagePhoto:
-		img := content.(*client.MessagePhoto)
-		convertImage(img.Photo.Sizes[0], evt)
-		convertText(img.Caption, evt)
-	case client.TypeMessageText:
-		txt := content.(*client.MessageText)
-		convertText(txt.Text, evt)
-	case client.TypeMessageVideo:
-		v := content.(*client.MessageVideo)
-		convertVideo(v.Video, evt)
-		convertText(v.Caption, evt)
-	default:
-		h.log.Info(fmt.Sprintf("unsupported message content type: %s\n", content.MessageContentType()))
-	}
-	h.log.Debug(fmt.Sprintf("New message %d from chat %d: converted to event id: %s, source: %s\n", msg.Id, msg.ChatId, evt.Id, evt.Source))
 	return
 }
 
