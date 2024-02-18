@@ -26,6 +26,9 @@ import (
 	//_ "net/http/pprof"
 )
 
+const chanCacheSize = 1024
+const chanCacheTtl = 1 * time.Minute
+
 func main() {
 
 	// init config and logger
@@ -105,6 +108,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	stor = storage.NewLocalCache(stor, chanCacheSize, chanCacheTtl)
 	stor = storage.NewStorageLogging(stor, log)
 	defer stor.Close()
 

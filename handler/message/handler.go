@@ -15,6 +15,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
 	"github.com/google/uuid"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"google.golang.org/grpc/metadata"
 	"io"
 	"log/slog"
@@ -28,7 +29,7 @@ type msgHandler struct {
 	clientTg        *client.Client
 	chansJoined     map[int64]model.Channel
 	chansJoinedLock *sync.Mutex
-	writers         map[int64]modelAwk.Writer[*pb.CloudEvent]
+	writers         *expirable.LRU[int64, modelAwk.Writer[*pb.CloudEvent]]
 	log             *slog.Logger
 }
 
@@ -56,6 +57,9 @@ const attrKeyFileImgHeight = "tgfileimgheight"
 const attrKeyFileImgWidth = "tgfileimgwidth"
 const attrKeyFileType = "tgfiletype"
 
+const writersCacheSize = 100
+const writersCacheTtl = 15 * time.Minute
+
 var errNoAck = errors.New("event was not accepted")
 
 func NewHandler(
@@ -70,9 +74,13 @@ func NewHandler(
 		clientTg:        clientTg,
 		chansJoined:     chansJoined,
 		chansJoinedLock: chansJoinedLock,
-		writers:         map[int64]modelAwk.Writer[*pb.CloudEvent]{},
+		writers:         expirable.NewLRU[int64, modelAwk.Writer[*pb.CloudEvent]](writersCacheSize, evictWriter, writersCacheTtl),
 		log:             log,
 	}
+}
+
+func evictWriter(_ int64, w modelAwk.Writer[*pb.CloudEvent]) {
+	_ = w.Close()
 }
 
 func (h msgHandler) Handle(msg *client.Message) (err error) {
@@ -100,10 +108,13 @@ func (h msgHandler) Handle(msg *client.Message) (err error) {
 }
 
 func (h msgHandler) Close() (err error) {
-	for _, w := range h.writers {
-		_ = w.Close()
+	for _, k := range h.writers.Keys() {
+		w, found := h.writers.Get(k)
+		if found {
+			_ = w.Close()
+		}
 	}
-	clear(h.writers)
+	h.writers.Purge()
 	return
 }
 
@@ -280,7 +291,7 @@ func (h msgHandler) getWriterAndPublish(chanId int64, evt *pb.CloudEvent) (err e
 			h.chansJoinedLock.Lock()
 			defer h.chansJoinedLock.Unlock()
 			_ = w.Close()
-			delete(h.writers, chanId)
+			h.writers.Remove(chanId)
 		default:
 			h.log.Error(fmt.Sprintf("Failed to publish event %s from channel %d, cause: %s", evt.Id, chanId, err))
 		}
@@ -292,7 +303,7 @@ func (h msgHandler) getWriter(chanId int64) (w modelAwk.Writer[*pb.CloudEvent], 
 	h.chansJoinedLock.Lock()
 	defer h.chansJoinedLock.Unlock()
 	var ok bool
-	w, ok = h.writers[chanId]
+	w, ok = h.writers.Get(chanId)
 	if !ok {
 		h.log.Debug(fmt.Sprintf("Writer not found for channel id = %d", chanId))
 		var ch model.Channel
@@ -308,7 +319,7 @@ func (h msgHandler) getWriter(chanId int64) (w modelAwk.Writer[*pb.CloudEvent], 
 			w, err = h.clientAwk.OpenMessagesWriter(ctxGroupId, userId)
 			if err == nil {
 				h.log.Debug(fmt.Sprintf("New message writer is open for chanId=%d, groupId=%s, userId=%s", chanId, ch.GroupId, userId))
-				h.writers[chanId] = w
+				h.writers.Add(chanId, w)
 			}
 		default:
 			h.log.Debug(fmt.Sprintf("No joined channel found for id = %d", chanId))
