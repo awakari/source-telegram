@@ -57,8 +57,7 @@ const attrKeyFileImgHeight = "tgfileimgheight"
 const attrKeyFileImgWidth = "tgfileimgwidth"
 const attrKeyFileType = "tgfiletype"
 
-const writersCacheSize = 100
-const writersCacheTtl = 15 * time.Minute
+const writerCacheTtl = 15 * time.Minute
 
 var errNoAck = errors.New("event was not accepted")
 
@@ -68,13 +67,14 @@ func NewHandler(
 	chansJoined map[int64]model.Channel,
 	chansJoinedLock *sync.Mutex,
 	log *slog.Logger,
+	writerCacheSize int,
 ) handler.Handler[*client.Message] {
 	return msgHandler{
 		clientAwk:       clientAwk,
 		clientTg:        clientTg,
 		chansJoined:     chansJoined,
 		chansJoinedLock: chansJoinedLock,
-		writers:         expirable.NewLRU[int64, modelAwk.Writer[*pb.CloudEvent]](writersCacheSize, evictWriter, writersCacheTtl),
+		writers:         expirable.NewLRU[int64, modelAwk.Writer[*pb.CloudEvent]](writerCacheSize, evictWriter, writerCacheTtl),
 		log:             log,
 	}
 }

@@ -28,6 +28,8 @@ import (
 
 const chanCacheSize = 1024
 const chanCacheTtl = 1 * time.Minute
+const writerCacheSizeMax = 65_536
+const writerCacheSizeMin = 16
 
 func main() {
 
@@ -149,7 +151,11 @@ func main() {
 	}()
 
 	// init handlers
-	msgHandler := message.NewHandler(clientAwk, clientTg, chansJoined, chansJoinedLock, log)
+	writerCacheSize := int(writerCacheSizeMax / cfg.Replica.Range)
+	if writerCacheSize < writerCacheSizeMin {
+		writerCacheSize = writerCacheSizeMin
+	}
+	msgHandler := message.NewHandler(clientAwk, clientTg, chansJoined, chansJoinedLock, log, writerCacheSize)
 	defer msgHandler.Close()
 
 	// expose the profiling
