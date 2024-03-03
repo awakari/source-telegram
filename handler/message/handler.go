@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"log/slog"
 	"strconv"
@@ -43,11 +44,12 @@ const (
 	FileTypeVideo
 )
 
-const attrValType = "com.github.awakari.source-telegram"
+const attrValType = "com.github.awakari.source-telegram.v1"
 const attrValSpecVersion = "1.0"
 const attrKeyLatitude = "latitude"
 const attrKeyLongitude = "longitude"
 const attrKeyMsgId = "tgmessageid"
+const attrKeyTime = "time"
 
 // file attrs
 const attrKeyFileId = "tgfileid"
@@ -131,6 +133,11 @@ func (h msgHandler) convertToEvent(chanId int64, msg *client.Message) (evt *pb.C
 					attrKeyMsgId: {
 						Attr: &pb.CloudEventAttributeValue_CeString{
 							CeString: strconv.FormatInt(msg.Id, 10),
+						},
+					},
+					attrKeyTime: {
+						Attr: &pb.CloudEventAttributeValue_CeTimestamp{
+							CeTimestamp: timestamppb.New(time.Unix(int64(msg.Date), 0)),
 						},
 					},
 				},
