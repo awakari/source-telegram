@@ -2,7 +2,7 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-replicaCount: 2
+replicaCount: 3
 
 image:
   repository: ghcr.io/awakari/source-telegram
@@ -90,6 +90,7 @@ db:
   table:
     # Database table name to use.
     name: tgchans
+    retention: "2160h" # 90 days
     shard: true
   tls:
     enabled: false

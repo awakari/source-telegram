@@ -9,6 +9,7 @@ service Service {
   rpc Read(ReadRequest) returns (ReadResponse);
   rpc Delete(DeleteRequest) returns (DeleteResponse);
   rpc List(ListRequest) returns (ListResponse);
+  rpc SearchAndAdd(SearchAndAddRequest) returns (SearchAndAddResponse);
 }
 
 message CreateRequest {
@@ -59,4 +60,15 @@ message Filter {
   string groupId = 1;
   string userId = 2;
   string pattern = 3;
+}
+
+message SearchAndAddRequest {
+  string groupId = 1;
+  string subId = 2;
+  string terms = 3;
+  uint32 limit = 4;
+}
+
+message SearchAndAddResponse {
+  uint32 countAdded = 1;
 }

@@ -81,6 +81,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: DB_TABLE_RETENTION
+              value: "{{ .Values.db.table.retention }}"
           stdin: true
           tty: true
           securityContext:

@@ -1,4 +1,4 @@
-FROM golang:1.21.5-alpine3.19 as go-builder
+FROM golang:1.22.2-alpine3.19 as go-builder
 
 ENV LANG en_US.UTF-8
 ENV TZ UTC
@@ -33,7 +33,7 @@ RUN make proto && go build \
     "./main.go" && \
     ls -lah
 
-FROM alpine:3.19.0
+FROM alpine:3.19.1
 
 ENV LANG en_US.UTF-8
 ENV TZ UTC
