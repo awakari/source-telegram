@@ -230,7 +230,7 @@ func (svc service) searchAndAdd(ctx context.Context, groupId, subId, term string
 					chatErr = svc.stor.Create(ctx, model.Channel{
 						Id:      chatId,
 						GroupId: groupId,
-						Name:    fmt.Sprintf("%+v", sg.Usernames),
+						Name:    name,
 						Link:    "@" + name,
 						SubId:   subId,
 						Terms:   term,
