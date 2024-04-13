@@ -1,3 +1,4 @@
+replicaCount: 3
 api:
   writer:
     uri: "api:50051"
