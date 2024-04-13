@@ -235,7 +235,6 @@ func (svc service) searchAndAdd(ctx context.Context, groupId, subId, term string
 						SubId:   subId,
 						Terms:   term,
 						Created: now,
-						Last:    now,
 					})
 				}
 			}

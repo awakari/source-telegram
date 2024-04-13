@@ -180,6 +180,8 @@ func (sm storageMongo) Create(ctx context.Context, ch model.Channel) (err error)
 		Name:    ch.Name,
 		Link:    ch.Link,
 		Created: ch.Created,
+		SubId:   ch.SubId,
+		Terms:   ch.Terms,
 	}
 	_, err = sm.coll.InsertOne(ctx, rec)
 	err = decodeError(err, ch.Link)
