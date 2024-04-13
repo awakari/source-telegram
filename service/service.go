@@ -169,7 +169,7 @@ func (svc service) updateJoined(ctx context.Context, ch model.Channel) {
 		svc.chansJoined[ch.Id] = &ch
 	default:
 		if chRuntime.Last.After(ch.Last) {
-			err := svc.stor.Update(ctx, ch.Link, ch.Last)
+			err := svc.stor.Update(ctx, ch.Link, chRuntime.Last)
 			if err != nil {
 				svc.log.Warn(fmt.Sprintf("Failed to update the channel %s last update time, cause: %s", ch.Link, err))
 			}
