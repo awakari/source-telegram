@@ -4,6 +4,8 @@ package awakari.source.telegram;
 
 option go_package = "./api/grpc";
 
+import "google/protobuf/timestamp.proto";
+
 service Service {
   rpc Create(CreateRequest) returns (CreateResponse);
   rpc Read(ReadRequest) returns (ReadResponse);
@@ -54,6 +56,10 @@ message Channel {
   string userId = 3;
   string name = 4;
   string link = 5;
+  string subId = 6;
+  string terms = 7;
+  google.protobuf.Timestamp last = 8;
+  google.protobuf.Timestamp created = 9;
 }
 
 message Filter {
