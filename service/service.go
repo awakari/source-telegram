@@ -34,8 +34,7 @@ type service struct {
 
 const ListLimit = 1_000
 const RefreshInterval = 5 * time.Minute
-const minTermLen = 4
-const minChanMemberCount = 100
+const minChanMemberCount = 2_345
 
 func NewService(
 	clientTg *client.Client,
