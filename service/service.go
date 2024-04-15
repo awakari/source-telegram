@@ -7,9 +7,7 @@ import (
 	"github.com/akurilov/go-tdlib/client"
 	"github.com/awakari/source-telegram/model"
 	"github.com/awakari/source-telegram/storage"
-	"github.com/awakari/source-telegram/util"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 )
@@ -179,27 +177,9 @@ func (svc service) updateJoined(ctx context.Context, ch model.Channel) {
 }
 
 func (svc service) SearchAndAdd(ctx context.Context, groupId, subId, terms string, limit uint32) (n uint32, err error) {
-	terms = util.Sanitize(terms)
-	termSet := map[string]bool{}
-	for _, t := range strings.Split(terms, " ") {
-		if len(t) >= minTermLen {
-			termSet[t] = true
-		}
-	}
-	var tn uint32
-	var tErr error
-	for t, _ := range termSet {
-		tn, tErr = svc.searchAndAdd(ctx, subId, groupId, t, limit)
-		n += tn
-		err = errors.Join(err, tErr)
-	}
-	return
-}
-
-func (svc service) searchAndAdd(ctx context.Context, groupId, subId, term string, limit uint32) (n uint32, err error) {
 	var chats *client.Chats
 	chats, err = svc.clientTg.SearchPublicChats(&client.SearchPublicChatsRequest{
-		Query: term,
+		Query: terms,
 	})
 	if err == nil && chats != nil {
 		for i, chatId := range chats.ChatIds {
@@ -233,7 +213,7 @@ func (svc service) searchAndAdd(ctx context.Context, groupId, subId, term string
 						Name:    name,
 						Link:    "@" + name,
 						SubId:   subId,
-						Terms:   term,
+						Terms:   terms,
 						Created: now,
 					})
 				}
