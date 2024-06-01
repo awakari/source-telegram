@@ -213,6 +213,7 @@ func (svc service) SearchAndAdd(ctx context.Context, groupId, subId, terms strin
 						Link:    "@" + name,
 						SubId:   subId,
 						Terms:   terms,
+						Last:    now,
 						Created: now,
 					})
 				}

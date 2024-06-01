@@ -179,6 +179,7 @@ func (sm storageMongo) Create(ctx context.Context, ch model.Channel) (err error)
 		UserId:  ch.UserId,
 		Name:    ch.Name,
 		Link:    ch.Link,
+		Last:    ch.Last,
 		Created: ch.Created,
 		SubId:   ch.SubId,
 		Terms:   ch.Terms,
