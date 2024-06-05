@@ -11,4 +11,5 @@ type ChannelFilter struct {
 	GroupId string
 	UserId  string
 	Pattern string
+	SubId   string
 }

@@ -83,6 +83,7 @@ func (c controller) List(ctx context.Context, req *ListRequest) (resp *ListRespo
 		filter.GroupId = req.Filter.GroupId
 		filter.UserId = req.Filter.UserId
 		filter.Pattern = req.Filter.Pattern
+		filter.SubId = req.Filter.SubId
 	}
 	var order model.Order
 	switch req.Order {
