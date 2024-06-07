@@ -27,8 +27,6 @@ type service struct {
 	stor            storage.Storage
 	chansJoined     map[int64]*model.Channel
 	chansJoinedLock *sync.Mutex
-	replicaRange    uint32
-	replicaIndex    uint32
 	log             *slog.Logger
 }
 
@@ -41,8 +39,6 @@ func NewService(
 	stor storage.Storage,
 	chansJoined map[int64]*model.Channel,
 	chansJoinedLock *sync.Mutex,
-	replicaRange uint32,
-	replicaIndex uint32,
 	log *slog.Logger,
 ) Service {
 	return service{
@@ -50,8 +46,6 @@ func NewService(
 		stor:            stor,
 		chansJoined:     chansJoined,
 		chansJoinedLock: chansJoinedLock,
-		replicaRange:    replicaRange,
-		replicaIndex:    replicaIndex,
 		log:             log,
 	}
 }
@@ -112,8 +106,7 @@ func (svc service) refreshJoined(ctx context.Context) (err error) {
 		svc.log.Debug(fmt.Sprintf("Refresh joined channels: got %d from the client", len(chatsJoined.ChatIds)))
 		//
 		chanFilter := model.ChannelFilter{
-			IdDiv: svc.replicaRange,
-			IdRem: svc.replicaIndex,
+			// TODO country code
 		}
 		chans, err = svc.stor.GetPage(ctx, chanFilter, ListLimit, "", model.OrderAsc) // it's important to get all at once
 	}

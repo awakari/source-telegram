@@ -268,14 +268,7 @@ func (sm storageMongo) Delete(ctx context.Context, link string) (err error) {
 
 func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error) {
 	q := bson.M{}
-	if filter.IdDiv != 0 {
-		q[attrId] = bson.M{
-			"$mod": bson.A{
-				filter.IdDiv,
-				-int32(filter.IdRem),
-			},
-		}
-	}
+	// TODO filter by country
 	if filter.UserId != "" {
 		q[attrGroupId] = filter.GroupId
 		q[attrUserId] = filter.UserId

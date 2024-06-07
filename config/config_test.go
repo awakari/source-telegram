@@ -15,8 +15,6 @@ func TestConfig(t *testing.T) {
 	os.Setenv("API_TELEGRAM_ID", "123456789")
 	os.Setenv("API_TELEGRAM_HASH", "deadcodecafebeef")
 	os.Setenv("API_TELEGRAM_FEED_CHAT_IDS", "-1001754252633,-1001260622817,-1001801930101")
-	os.Setenv("REPLICA_RANGE", "2")
-	os.Setenv("REPLICA_NAME", "replica-1")
 	cfg, err := NewConfigFromEnv()
 	assert.Nil(t, err)
 	assert.Equal(t, "writer:56789", cfg.Api.Writer.Uri)

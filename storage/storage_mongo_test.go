@@ -310,18 +310,18 @@ func TestStorageMongo_GetPage(t *testing.T) {
 				ids[3],
 			},
 		},
-		"filter": {
-			filter: model.ChannelFilter{
-				IdDiv: 2,
-				IdRem: 1,
-			},
-			limit: 10,
-			page: []int64{
-				ids[2],
-				ids[3],
-				ids[4],
-			},
-		},
+		// TODO filter by country
+		//"filter": {
+		//	filter: model.ChannelFilter{
+		//
+		//	},
+		//	limit: 10,
+		//	page: []int64{
+		//		ids[2],
+		//		ids[3],
+		//		ids[4],
+		//	},
+		//},
 		"limit": {
 			limit: 2,
 			page: []int64{

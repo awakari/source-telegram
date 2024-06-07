@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: {{ include "source-telegram.fullname" . }}
   labels:
@@ -75,12 +75,6 @@ spec:
               value: "{{ .Values.db.tls.insecure }}"
             - name: LOG_LEVEL
               value: "{{ .Values.log.level }}"
-            - name: REPLICA_RANGE
-              value: "{{ .Values.replicaCount }}"
-            - name: REPLICA_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
             - name: DB_TABLE_RETENTION
               value: "{{ .Values.db.table.retention }}"
           stdin: true
