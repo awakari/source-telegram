@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "source-telegram.fullname" . }}
   labels:
@@ -30,23 +30,27 @@ spec:
       containers:
         - name: {{ .Chart.Name }}
           env:
-            - name: API_PORT
-              value: "{{ .Values.service.portGrpc }}"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: API_TELEGRAM_ID
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens"
+                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{`{{ index (split "-" (env "POD_NAME")) 1 }}`}}"
                   key: id
             - name: API_TELEGRAM_HASH
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens"
+                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{.Values.sim.label}}"
                   key: hash
             - name: API_TELEGRAM_PHONE
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens"
+                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{.Values.sim.label}}"
                   key: phone
+            - name: API_PORT
+              value: "{{ .Values.service.portGrpc }}"
             - name: API_WRITER_URI
               value: "{{ .Values.api.writer.uri }}"
             - name: DB_URI
