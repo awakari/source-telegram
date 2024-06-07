@@ -42,12 +42,12 @@ spec:
             - name: API_TELEGRAM_HASH
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{.Values.sim.label}}"
+                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{`{{ index (split "-" (env "POD_NAME")) 1 }}`}}"
                   key: hash
             - name: API_TELEGRAM_PHONE
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{.Values.sim.label}}"
+                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{`{{ index (split "-" (env "POD_NAME")) 1 }}`}}"
                   key: phone
             - name: API_PORT
               value: "{{ .Values.service.portGrpc }}"
