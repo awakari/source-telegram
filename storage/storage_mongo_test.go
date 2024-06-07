@@ -253,7 +253,7 @@ func TestStorageMongo_Update(t *testing.T) {
 
 func TestStorageMongo_GetPage(t *testing.T) {
 	//
-	collName := fmt.Sprintf("feeds-test-%d", time.Now().UnixMicro())
+	collName := fmt.Sprintf("tgchans-test-%d", time.Now().UnixMicro())
 	dbCfg := config.DbConfig{
 		Uri:  dbUri,
 		Name: "sources",
@@ -277,12 +277,13 @@ func TestStorageMongo_GetPage(t *testing.T) {
 		-1001754252633,
 		-1001801930101,
 	}
-	for _, id := range ids {
+	for i, id := range ids {
 		_, err = sm.coll.InsertOne(ctx, bson.M{
 			attrId:    id,
 			attrName:  strconv.FormatInt(id, 10),
 			attrLink:  fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-id, 10)),
 			attrSubId: strconv.FormatInt(-id, 10),
+			attrLabel: strconv.Itoa(i % 2),
 		})
 		require.Nil(t, err)
 	}
@@ -310,18 +311,16 @@ func TestStorageMongo_GetPage(t *testing.T) {
 				ids[3],
 			},
 		},
-		// TODO filter by country
-		//"filter": {
-		//	filter: model.ChannelFilter{
-		//
-		//	},
-		//	limit: 10,
-		//	page: []int64{
-		//		ids[2],
-		//		ids[3],
-		//		ids[4],
-		//	},
-		//},
+		"filter": {
+			filter: model.ChannelFilter{
+				Label: "1",
+			},
+			limit: 10,
+			page: []int64{
+				ids[1],
+				ids[3],
+			},
+		},
 		"limit": {
 			limit: 2,
 			page: []int64{

@@ -23,6 +23,7 @@ type recChan struct {
 	Last    time.Time `bson:"last,omitempty"`
 	SubId   string    `bson:"subId,omitempty"`
 	Terms   string    `bson:"terms,omitempty"`
+	Label   string    `bson:"label,omitempty"`
 }
 
 const attrId = "id"
@@ -34,6 +35,7 @@ const attrCreated = "created"
 const attrLast = "last"
 const attrSubId = "subId"
 const attrTerms = "terms"
+const attrLabel = "label"
 
 type storageMongo struct {
 	conn *mongo.Client
@@ -81,6 +83,10 @@ var projGet = bson.D{
 	},
 	{
 		Key:   attrTerms,
+		Value: 1,
+	},
+	{
+		Key:   attrLabel,
 		Value: 1,
 	},
 }
@@ -177,6 +183,18 @@ func (sm storageMongo) ensureIndices(ctx context.Context, retentionPeriod time.D
 				SetSparse(true).
 				SetUnique(false),
 		},
+		{
+			Keys: bson.D{
+				{
+					Key:   attrLabel,
+					Value: 1,
+				},
+			},
+			Options: options.
+				Index().
+				SetSparse(true).
+				SetUnique(false),
+		},
 	})
 }
 
@@ -195,6 +213,7 @@ func (sm storageMongo) Create(ctx context.Context, ch model.Channel) (err error)
 		Created: ch.Created,
 		SubId:   ch.SubId,
 		Terms:   ch.Terms,
+		Label:   ch.Label,
 	}
 	_, err = sm.coll.InsertOne(ctx, rec)
 	err = decodeError(err, ch.Link)
@@ -222,6 +241,7 @@ func (sm storageMongo) Read(ctx context.Context, link string) (ch model.Channel,
 		ch.Last = rec.Last
 		ch.SubId = rec.SubId
 		ch.Terms = rec.Terms
+		ch.Label = rec.Label
 	}
 	err = decodeError(err, link)
 	return
@@ -268,7 +288,9 @@ func (sm storageMongo) Delete(ctx context.Context, link string) (err error) {
 
 func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error) {
 	q := bson.M{}
-	// TODO filter by country
+	if filter.Label != "" {
+		q[attrLabel] = filter.Label
+	}
 	if filter.UserId != "" {
 		q[attrGroupId] = filter.GroupId
 		q[attrUserId] = filter.UserId
@@ -326,6 +348,7 @@ func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, 
 					UserId:  rec.UserId,
 					Name:    rec.Name,
 					Link:    rec.Link,
+					Label:   rec.Label,
 				})
 			}
 		}

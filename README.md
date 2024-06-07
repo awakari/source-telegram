@@ -2,10 +2,10 @@
 
 Before deploying:
 ```shell
-kubectl create secret generic source-telegram-tokens-<NUM> \
-  --from-literal=id=<TG_APP_ID> \
-  --from-literal=hash=<TG_APP_HASH> \
-  --from-literal=phone=<TG_PHONE_NUM>
+kubectl create secret generic source-telegram-tokens \
+  --from-literal=ids=<TG_APP_ID_0>,<TG_APP_ID_1>,... \
+  --from-literal=hashes=<TG_APP_HASH_0>,<TG_APP_HASH_1>,... \
+  --from-literal=phones=<TG_PHONE_NUM_0>,<TG_PHONE_NUM_1>,...
 ```
 
 Once deployed in K8s, it requires a manual code input to complete the Telegram authentication.

@@ -8,6 +8,7 @@ import (
 	"github.com/awakari/source-telegram/model"
 	"github.com/awakari/source-telegram/storage"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -28,6 +29,7 @@ type service struct {
 	chansJoined     map[int64]*model.Channel
 	chansJoinedLock *sync.Mutex
 	log             *slog.Logger
+	replicaIndex    int
 }
 
 const ListLimit = 1_000
@@ -40,6 +42,7 @@ func NewService(
 	chansJoined map[int64]*model.Channel,
 	chansJoinedLock *sync.Mutex,
 	log *slog.Logger,
+	replicaIndex int,
 ) Service {
 	return service{
 		clientTg:        clientTg,
@@ -47,6 +50,7 @@ func NewService(
 		chansJoined:     chansJoined,
 		chansJoinedLock: chansJoinedLock,
 		log:             log,
+		replicaIndex:    replicaIndex,
 	}
 }
 
@@ -105,8 +109,9 @@ func (svc service) refreshJoined(ctx context.Context) (err error) {
 	if err == nil {
 		svc.log.Debug(fmt.Sprintf("Refresh joined channels: got %d from the client", len(chatsJoined.ChatIds)))
 		//
-		chanFilter := model.ChannelFilter{
-			// TODO country code
+		var chanFilter model.ChannelFilter
+		if svc.replicaIndex > 0 {
+			chanFilter.Label = strconv.Itoa(svc.replicaIndex)
 		}
 		chans, err = svc.stor.GetPage(ctx, chanFilter, ListLimit, "", model.OrderAsc) // it's important to get all at once
 	}

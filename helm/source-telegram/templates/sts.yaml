@@ -30,25 +30,25 @@ spec:
       containers:
         - name: {{ .Chart.Name }}
           env:
-            - name: POD_NAME
+            - name: REPLICA_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: API_TELEGRAM_ID
+            - name: API_TELEGRAM_IDS
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{ $(POD_NAME) | split('-') | last}}"
-                  key: id
-            - name: API_TELEGRAM_HASH
+                  name: "{{ include "source-telegram.fullname" . }}-tokens"
+                  key: ids
+            - name: API_TELEGRAM_HASHES
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{ $(POD_NAME) | split('-') | last}}"
-                  key: hash
-            - name: API_TELEGRAM_PHONE
+                  name: "{{ include "source-telegram.fullname" . }}-tokens"
+                  key: hashes
+            - name: API_TELEGRAM_PHONES
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{ $(POD_NAME) | split('-') | last}}"
-                  key: phone
+                  name: "{{ include "source-telegram.fullname" . }}-tokens"
+                  key: phones
             - name: API_PORT
               value: "{{ .Values.service.portGrpc }}"
             - name: API_WRITER_URI

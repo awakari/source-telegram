@@ -14,6 +14,8 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -24,7 +26,7 @@ import (
 	//_ "net/http/pprof"
 )
 
-const chanCacheSize = 1024
+const chanCacheSize = 1_000
 const chanCacheTtl = 1 * time.Minute
 
 func main() {
@@ -58,14 +60,39 @@ func main() {
 		}
 		chCode <- line
 	}()
+
+	// determine the replica index
+	replicaNameParts := strings.Split(cfg.Replica.Name, "-")
+	if len(replicaNameParts) < 2 {
+		panic("unable to parse the replica name: " + cfg.Replica.Name)
+	}
+	var replicaIndex int
+	replicaIndex, err = strconv.Atoi(replicaNameParts[len(replicaNameParts)-1])
+	if err != nil {
+		panic(err)
+	}
+	if replicaIndex < 0 {
+		panic(fmt.Sprintf("Negative replica index: %d", replicaIndex))
+	}
+	log.Info(fmt.Sprintf("Replica: %d", replicaIndex))
+
+	if len(cfg.Api.Telegram.Ids) <= replicaIndex {
+		panic("Not enough telegram client ids, decrease the replica count or fix the config")
+	}
+	if len(cfg.Api.Telegram.Hashes) <= replicaIndex {
+		panic("Not enough telegram client hashes, decrease the replica count or fix the config")
+	}
+	if len(cfg.Api.Telegram.Phones) <= replicaIndex {
+		panic("Not enough phone numbers, decrease the replica count or fix the config")
+	}
 	//
-	go client.NonInteractiveCredentialsProvider(authorizer, cfg.Api.Telegram.Phone, cfg.Api.Telegram.Password, chCode)
+	go client.NonInteractiveCredentialsProvider(authorizer, cfg.Api.Telegram.Phones[replicaIndex], cfg.Api.Telegram.Password, chCode)
 	authorizer.TdlibParameters <- &client.SetTdlibParametersRequest{
 		//
 		UseTestDc:          false,
 		UseSecretChats:     false,
-		ApiId:              cfg.Api.Telegram.Id,
-		ApiHash:            cfg.Api.Telegram.Hash,
+		ApiId:              cfg.Api.Telegram.Ids[replicaIndex],
+		ApiHash:            cfg.Api.Telegram.Hashes[replicaIndex],
 		SystemLanguageCode: "en",
 		DeviceModel:        "Awakari",
 		SystemVersion:      "1.0.0",
@@ -125,7 +152,7 @@ func main() {
 	chansJoined := map[int64]*model.Channel{}
 	chansJoinedLock := &sync.Mutex{}
 
-	svc := service.NewService(clientTg, stor, chansJoined, chansJoinedLock, log)
+	svc := service.NewService(clientTg, stor, chansJoined, chansJoinedLock, log, replicaIndex)
 	svc = service.NewServiceLogging(svc, log)
 	go func() {
 		b := backoff.NewExponentialBackOff()

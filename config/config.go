@@ -9,10 +9,10 @@ type Config struct {
 	Api struct {
 		Port     uint16 `envconfig:"API_PORT" default:"50051" required:"true"`
 		Telegram struct {
-			Id       int32  `envconfig:"API_TELEGRAM_ID" required:"true"`
-			Hash     string `envconfig:"API_TELEGRAM_HASH" required:"true"`
-			Password string `envconfig:"API_TELEGRAM_PASS" default:""`
-			Phone    string `envconfig:"API_TELEGRAM_PHONE" required:"true"`
+			Ids      []int32  `envconfig:"API_TELEGRAM_IDS" required:"true"`
+			Hashes   []string `envconfig:"API_TELEGRAM_HASHES" required:"true"`
+			Phones   []string `envconfig:"API_TELEGRAM_PHONES" required:"true"`
+			Password string   `envconfig:"API_TELEGRAM_PASS" default:""`
 		}
 		Writer struct {
 			Uri string `envconfig:"API_WRITER_URI" default:"resolver:50051" required:"true"`
@@ -22,6 +22,7 @@ type Config struct {
 	Log struct {
 		Level int `envconfig:"LOG_LEVEL" default:"-4" required:"true"`
 	}
+	Replica ReplicaConfig
 }
 
 type DbConfig struct {
@@ -38,6 +39,10 @@ type DbConfig struct {
 		Enabled  bool `envconfig:"DB_TLS_ENABLED" default:"false" required:"true"`
 		Insecure bool `envconfig:"DB_TLS_INSECURE" default:"false" required:"true"`
 	}
+}
+
+type ReplicaConfig struct {
+	Name string `envconfig:"REPLICA_NAME" required:"true"`
 }
 
 func NewConfigFromEnv() (cfg Config, err error) {
