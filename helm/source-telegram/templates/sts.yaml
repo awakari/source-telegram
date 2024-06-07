@@ -37,17 +37,17 @@ spec:
             - name: API_TELEGRAM_ID
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{`{{ index (split "-" (env "POD_NAME")) 1 }}`}}"
+                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{ $(POD_NAME) | split('-') | last}}"
                   key: id
             - name: API_TELEGRAM_HASH
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{`{{ index (split "-" (env "POD_NAME")) 1 }}`}}"
+                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{ $(POD_NAME) | split('-') | last}}"
                   key: hash
             - name: API_TELEGRAM_PHONE
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{`{{ index (split "-" (env "POD_NAME")) 1 }}`}}"
+                  name: "{{ include "source-telegram.fullname" . }}-tokens-{{ $(POD_NAME) | split('-') | last}}"
                   key: phone
             - name: API_PORT
               value: "{{ .Values.service.portGrpc }}"
