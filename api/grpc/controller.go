@@ -35,6 +35,7 @@ func (c controller) Create(ctx context.Context, req *CreateRequest) (resp *Creat
 			Name:    req.Channel.Name,
 			Link:    req.Channel.Link,
 			Created: time.Now().UTC(),
+			Label:   req.Channel.Label,
 		}
 		err = c.svc.Create(ctx, ch)
 		err = encodeError(err)
@@ -56,6 +57,7 @@ func (c controller) Read(ctx context.Context, req *ReadRequest) (resp *ReadRespo
 			Link:    ch.Link,
 			SubId:   ch.SubId,
 			Terms:   ch.Terms,
+			Label:   ch.Label,
 		}
 		if !ch.Created.IsZero() {
 			resp.Channel.Created = timestamppb.New(ch.Created)

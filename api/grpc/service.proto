@@ -60,6 +60,7 @@ message Channel {
   string terms = 7;
   google.protobuf.Timestamp last = 8;
   google.protobuf.Timestamp created = 9;
+  string label = 10;
 }
 
 message Filter {
