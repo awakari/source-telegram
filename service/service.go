@@ -36,9 +36,9 @@ type service struct {
 const ListLimit = 1_000
 const RefreshInterval = 15 * time.Minute
 const minChanMemberCount = 2_345
-const tagNoBot = "#nobot"
+const TagNoBot = "#nobot"
 
-var ErrNoBot = fmt.Errorf("chat contains the %s tag in description", tagNoBot)
+var ErrNoBot = fmt.Errorf("chat/message contains the %s tag", TagNoBot)
 
 func NewService(
 	clientTg *client.Client,
@@ -154,7 +154,7 @@ func (svc service) refreshJoined(ctx context.Context) (err error) {
 			switch joined {
 			case true:
 				if svc.chatContainsNoBotTag(ch.Id) {
-					svc.log.Debug(fmt.Sprintf("Channel contains the %s tag in the description, removing, id: %d, title: %s, user: %s", tagNoBot, ch.Id, ch.Name, ch.UserId))
+					svc.log.Debug(fmt.Sprintf("Channel contains the %s tag in the description, removing, id: %d, title: %s, user: %s", TagNoBot, ch.Id, ch.Name, ch.UserId))
 					_ = svc.Delete(ctx, ch.Link)
 				} else {
 					svc.log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s, user: %s", ch.Id, ch.Name, ch.UserId))
@@ -269,7 +269,7 @@ func (svc service) supergroupContainsNoBotTag(chId, sgId int64) (contains bool) 
 	svc.log.Debug(fmt.Sprintf("GetSupergroupFullInfo(%d, %d): %+v, %s", chId, sgId, info, err))
 	if err == nil && info != nil {
 		for _, descrPart := range strings.Split(info.Description, " ") {
-			if descrPart == tagNoBot {
+			if descrPart == TagNoBot {
 				contains = true
 				break
 			}

@@ -12,6 +12,7 @@ import (
 	modelAwk "github.com/awakari/client-sdk-go/model"
 	"github.com/awakari/source-telegram/handler"
 	"github.com/awakari/source-telegram/model"
+	"github.com/awakari/source-telegram/service"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
 	"github.com/google/uuid"
@@ -21,6 +22,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -88,7 +90,7 @@ func evictWriter(_ int64, w modelAwk.Writer[*pb.CloudEvent]) {
 func (h msgHandler) Handle(msg *client.Message) (err error) {
 	chanId := msg.ChatId
 	evt := h.convertToEvent(chanId, msg)
-	if err == nil && evt != nil {
+	if evt != nil {
 		err = h.getWriterAndPublish(chanId, evt)
 		if err != nil {
 			// retry with a backoff
@@ -147,33 +149,40 @@ func (h msgHandler) convertToEvent(chanId int64, msg *client.Message) (evt *pb.C
 					},
 				},
 			}
+			var err error
 			switch content.MessageContentType() {
 			case client.TypeMessageAudio:
 				a := content.(*client.MessageAudio)
 				convertAudio(a.Audio, evt)
-				convertText(a.Caption, evt)
+				err = convertText(a.Caption, evt)
 			case client.TypeMessageDocument:
 				doc := content.(*client.MessageDocument)
 				convertDocument(doc.Document, evt)
-				convertText(doc.Caption, evt)
+				err = convertText(doc.Caption, evt)
 			case client.TypeMessageLocation:
 				loc := content.(*client.MessageLocation)
 				convertLocation(loc.Location, evt)
 			case client.TypeMessagePhoto:
 				img := content.(*client.MessagePhoto)
 				convertImage(img.Photo.Sizes[0], evt)
-				convertText(img.Caption, evt)
+				err = convertText(img.Caption, evt)
 			case client.TypeMessageText:
 				txt := content.(*client.MessageText)
-				convertText(txt.Text, evt)
+				err = convertText(txt.Text, evt)
 			case client.TypeMessageVideo:
 				v := content.(*client.MessageVideo)
 				convertVideo(v.Video, evt)
-				convertText(v.Caption, evt)
+				err = convertText(v.Caption, evt)
 			default:
 				h.log.Info(fmt.Sprintf("unsupported message content type: %s\n", content.MessageContentType()))
 			}
-			h.log.Debug(fmt.Sprintf("New message %d from chat %d: converted to event id: %s, source: %s\n", msg.Id, msg.ChatId, evt.Id, evt.Source))
+			switch err {
+			case nil:
+				h.log.Debug(fmt.Sprintf("New message %d from chat %d: converted to event id: %s, source: %s\n", msg.Id, msg.ChatId, evt.Id, evt.Source))
+			default:
+				h.log.Warn(fmt.Sprintf("Drop message %d from chat %d, cause: %s", msg.Id, msg.ChatId, err))
+				evt = nil
+			}
 		}
 	}
 	return
@@ -234,10 +243,17 @@ func convertImage(img *client.PhotoSize, evt *pb.CloudEvent) {
 	}
 }
 
-func convertText(txt *client.FormattedText, evt *pb.CloudEvent) {
+func convertText(txt *client.FormattedText, evt *pb.CloudEvent) (err error) {
+	for _, w := range strings.Split(txt.Text, " ") {
+		if w == service.TagNoBot {
+			err = service.ErrNoBot
+			return
+		}
+	}
 	evt.Data = &pb.CloudEvent_TextData{
 		TextData: txt.Text,
 	}
+	return
 }
 
 func convertVideo(v *client.Video, evt *pb.CloudEvent) {
