@@ -83,7 +83,7 @@ func TestServiceClient_Create(t *testing.T) {
 				Name:    "nobot",
 				Link:    "https://t.me/channel0",
 			},
-			err: status.Error(codes.PermissionDenied, "chat contains the #nobot tag in description"),
+			err: status.Error(codes.PermissionDenied, "chat/message contains the #nobot tag"),
 		},
 	}
 	//
