@@ -268,14 +268,11 @@ func (svc service) supergroupContainsNoBotTag(chId, sgId int64) (contains bool) 
 	})
 	svc.log.Debug(fmt.Sprintf("GetSupergroupFullInfo(%d, %d): %+v, %s", chId, sgId, info, err))
 	if err == nil && info != nil {
-		descr := info.Description
-		switch {
-		case strings.HasSuffix(descr, " "+tagNoBot):
-			contains = true
-		case strings.HasPrefix(descr, tagNoBot+" "):
-			contains = true
-		case strings.Contains(descr, " "+tagNoBot+" "):
-			contains = true
+		for _, descrPart := range strings.Split(info.Description, " ") {
+			if descrPart == tagNoBot {
+				contains = true
+				break
+			}
 		}
 	}
 	return
