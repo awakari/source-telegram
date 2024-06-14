@@ -127,6 +127,8 @@ func encodeError(src error) (dst error) {
 		dst = status.Error(codes.NotFound, src.Error())
 	case errors.Is(src, storage.ErrInternal):
 		dst = status.Error(codes.Internal, src.Error())
+	case errors.Is(src, service.ErrNoBot):
+		dst = status.Error(codes.PermissionDenied, src.Error())
 	case errors.Is(src, context.DeadlineExceeded):
 		dst = status.Error(codes.DeadlineExceeded, src.Error())
 	case errors.Is(src, context.Canceled):

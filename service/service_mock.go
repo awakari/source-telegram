@@ -20,6 +20,8 @@ func (s serviceMock) Create(ctx context.Context, ch model.Channel) (err error) {
 		err = storage.ErrInternal
 	case "conflict":
 		err = storage.ErrConflict
+	case "nobot":
+		err = ErrNoBot
 	}
 	return
 }

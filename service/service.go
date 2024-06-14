@@ -9,6 +9,7 @@ import (
 	"github.com/awakari/source-telegram/storage"
 	"log/slog"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,8 +34,11 @@ type service struct {
 }
 
 const ListLimit = 1_000
-const RefreshInterval = 5 * time.Minute
+const RefreshInterval = 15 * time.Minute
 const minChanMemberCount = 2_345
+const tagNoBot = "#nobot"
+
+var ErrNoBot = fmt.Errorf("chat contains the %s tag in description", tagNoBot)
 
 func NewService(
 	clientTg *client.Client,
@@ -66,6 +70,11 @@ func (svc service) Create(ctx context.Context, ch model.Channel) (err error) {
 		if ch.Name != newChat.Title {
 			ch.Name = newChat.Title
 		}
+		if svc.chatContainsNoBotTag(ch.Id) {
+			err = fmt.Errorf("%w: %+v", ErrNoBot, ch)
+		}
+	}
+	if err == nil {
 		ch.Created = time.Now().UTC()
 		ch.Last = ch.Created
 		err = svc.stor.Create(ctx, ch)
@@ -144,8 +153,13 @@ func (svc service) refreshJoined(ctx context.Context) (err error) {
 			}
 			switch joined {
 			case true:
-				svc.log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s, user: %s", ch.Id, ch.Name, ch.UserId))
-				svc.updateJoined(ctx, ch)
+				if svc.chatContainsNoBotTag(ch.Id) {
+					svc.log.Debug(fmt.Sprintf("Channel contains the %s tag in the description, removing, id: %d, title: %s, user: %s", tagNoBot, ch.Id, ch.Name, ch.UserId))
+					_ = svc.Delete(ctx, ch.Link)
+				} else {
+					svc.log.Debug(fmt.Sprintf("Selected channel id: %d, title: %s, user: %s", ch.Id, ch.Name, ch.UserId))
+					svc.updateJoined(ctx, ch)
+				}
 			default:
 				svc.log.Warn(fmt.Sprintf("Failed to join channel by id: %d, cause: %s", ch.Id, err))
 				err = nil
@@ -191,10 +205,16 @@ func (svc service) SearchAndAdd(ctx context.Context, groupId, subId, terms strin
 			var sg *client.Supergroup
 			if chatErr == nil && chat.Type.ChatTypeType() == client.TypeChatTypeSupergroup {
 				sgChat := chat.Type.(*client.ChatTypeSupergroup)
+				if svc.supergroupContainsNoBotTag(chatId, sgChat.SupergroupId) {
+					err = errors.Join(err, fmt.Errorf("%w: \"%s\"", ErrNoBot, chat.Title))
+					continue
+				}
 				if sgChat.IsChannel {
 					sg, chatErr = svc.clientTg.GetSupergroup(&client.GetSupergroupRequest{
 						SupergroupId: sgChat.SupergroupId,
 					})
+				} else {
+					continue
 				}
 			}
 			if chatErr == nil && sg != nil {
@@ -202,7 +222,7 @@ func (svc service) SearchAndAdd(ctx context.Context, groupId, subId, terms strin
 				if sg.Usernames != nil && len(sg.Usernames.ActiveUsernames) > 0 {
 					name = sg.Usernames.ActiveUsernames[0]
 				}
-				if name != "" && !sg.IsScam && !sg.IsFake && sg.MemberCount > minChanMemberCount {
+				if name != "" && sg.MemberCount > minChanMemberCount {
 					now := time.Now().UTC()
 					chatErr = svc.stor.Create(ctx, model.Channel{
 						Id:      chatId,
@@ -222,6 +242,40 @@ func (svc service) SearchAndAdd(ctx context.Context, groupId, subId, terms strin
 			default:
 				err = errors.Join(err, chatErr)
 			}
+		}
+	}
+	return
+}
+
+func (svc service) chatContainsNoBotTag(chId int64) (contains bool) {
+	var chat *client.Chat
+	chat, err := svc.clientTg.GetChat(&client.GetChatRequest{
+		ChatId: chId,
+	})
+	var sgChat *client.ChatTypeSupergroup
+	if err == nil && chat.Type.ChatTypeType() == client.TypeChatTypeSupergroup {
+		sgChat = chat.Type.(*client.ChatTypeSupergroup)
+	}
+	if err == nil && sgChat != nil {
+		contains = svc.supergroupContainsNoBotTag(chId, sgChat.SupergroupId)
+	}
+	return
+}
+
+func (svc service) supergroupContainsNoBotTag(chId, sgId int64) (contains bool) {
+	info, err := svc.clientTg.GetSupergroupFullInfo(&client.GetSupergroupFullInfoRequest{
+		SupergroupId: sgId,
+	})
+	svc.log.Debug(fmt.Sprintf("GetSupergroupFullInfo(%d, %d): %+v, %s", chId, sgId, info, err))
+	if err == nil && info != nil {
+		descr := info.Description
+		switch {
+		case strings.HasSuffix(descr, " "+tagNoBot):
+			contains = true
+		case strings.HasPrefix(descr, tagNoBot+" "):
+			contains = true
+		case strings.Contains(descr, " "+tagNoBot+" "):
+			contains = true
 		}
 	}
 	return

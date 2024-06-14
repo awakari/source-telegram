@@ -75,6 +75,16 @@ func TestServiceClient_Create(t *testing.T) {
 			},
 			err: status.Error(codes.AlreadyExists, "channel with the same id is already present"),
 		},
+		"nobot": {
+			ch: &Channel{
+				Id:      -123456789,
+				GroupId: "group0",
+				UserId:  "user0",
+				Name:    "nobot",
+				Link:    "https://t.me/channel0",
+			},
+			err: status.Error(codes.PermissionDenied, "chat contains the #nobot tag in description"),
+		},
 	}
 	//
 	for k, c := range cases {
