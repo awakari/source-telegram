@@ -34,6 +34,7 @@ type msgHandler struct {
 	chansJoinedLock *sync.Mutex
 	writers         *expirable.LRU[int64, modelAwk.Writer[*pb.CloudEvent]]
 	log             *slog.Logger
+	indexShard      int
 }
 
 type FileType int32
@@ -46,7 +47,7 @@ const (
 	FileTypeVideo
 )
 
-const attrValType = "com.awakari.source-telegram.v1"
+const fmtAttrValType = "com.awakari.source-telegram-%d.v1"
 const attrValSpecVersion = "1.0"
 const attrKeyLatitude = "latitude"
 const attrKeyLongitude = "longitude"
@@ -72,6 +73,7 @@ func NewHandler(
 	chansJoined map[int64]*model.Channel,
 	chansJoinedLock *sync.Mutex,
 	log *slog.Logger,
+	indexShard int,
 ) handler.Handler[*client.Message] {
 	return msgHandler{
 		clientAwk:       clientAwk,
@@ -80,6 +82,7 @@ func NewHandler(
 		chansJoinedLock: chansJoinedLock,
 		writers:         expirable.NewLRU[int64, modelAwk.Writer[*pb.CloudEvent]](writerCacheSize, evictWriter, writerCacheTtl),
 		log:             log,
+		indexShard:      indexShard,
 	}
 }
 
@@ -135,7 +138,7 @@ func (h msgHandler) convertToEvent(chanId int64, msg *client.Message) (evt *pb.C
 				Id:          uuid.NewString(),
 				Source:      src,
 				SpecVersion: attrValSpecVersion,
-				Type:        attrValType,
+				Type:        fmt.Sprintf(fmtAttrValType, h.indexShard),
 				Attributes: map[string]*pb.CloudEventAttributeValue{
 					attrKeyMsgId: {
 						Attr: &pb.CloudEventAttributeValue_CeString{

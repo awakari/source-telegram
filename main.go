@@ -162,7 +162,7 @@ func main() {
 	}()
 
 	// init handlers
-	msgHandler := message.NewHandler(clientAwk, clientTg, chansJoined, chansJoinedLock, log)
+	msgHandler := message.NewHandler(clientAwk, clientTg, chansJoined, chansJoinedLock, log, replicaIndex)
 	defer msgHandler.Close()
 
 	// expose the profiling

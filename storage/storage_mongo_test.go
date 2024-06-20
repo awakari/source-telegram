@@ -278,13 +278,22 @@ func TestStorageMongo_GetPage(t *testing.T) {
 		-1001801930101,
 	}
 	for i, id := range ids {
-		_, err = sm.coll.InsertOne(ctx, bson.M{
-			attrId:    id,
-			attrName:  strconv.FormatInt(id, 10),
-			attrLink:  fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-id, 10)),
-			attrSubId: strconv.FormatInt(-id, 10),
-			attrLabel: strconv.Itoa(i % 2),
-		})
+		if i%2 == 0 {
+			_, err = sm.coll.InsertOne(ctx, bson.M{
+				attrId:    id,
+				attrName:  strconv.FormatInt(id, 10),
+				attrLink:  fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-id, 10)),
+				attrSubId: strconv.FormatInt(-id, 10),
+			})
+		} else {
+			_, err = sm.coll.InsertOne(ctx, bson.M{
+				attrId:    id,
+				attrName:  strconv.FormatInt(id, 10),
+				attrLink:  fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-id, 10)),
+				attrSubId: strconv.FormatInt(-id, 10),
+				attrLabel: "1",
+			})
+		}
 		require.Nil(t, err)
 	}
 	//
@@ -298,7 +307,11 @@ func TestStorageMongo_GetPage(t *testing.T) {
 	}{
 		"basic": {
 			limit: 10,
-			page:  ids,
+			page: []int64{
+				ids[0],
+				ids[2],
+				ids[4],
+			},
 		},
 		"filter w/ pattern": {
 			filter: model.ChannelFilter{
@@ -308,7 +321,6 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			page: []int64{
 				ids[0],
 				ids[2],
-				ids[3],
 			},
 		},
 		"filter": {
@@ -325,7 +337,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			limit: 2,
 			page: []int64{
 				ids[0],
-				ids[1],
+				ids[2],
 			},
 		},
 		"cursor asc": {
@@ -333,7 +345,6 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			cursor: fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-ids[1], 10)),
 			page: []int64{
 				ids[2],
-				ids[3],
 				ids[4],
 			},
 		},
@@ -343,7 +354,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			order:  model.OrderDesc,
 			page: []int64{
 				ids[2],
-				ids[1],
+				ids[0],
 			},
 		},
 		"end of results": {
