@@ -1,4 +1,4 @@
-FROM golang:1.22.3-alpine3.20 as go-builder
+FROM golang:1.22.5-alpine3.20 as go-builder
 
 ENV LANG en_US.UTF-8
 ENV TZ UTC

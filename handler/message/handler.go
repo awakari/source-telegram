@@ -15,8 +15,8 @@ import (
 	"github.com/awakari/source-telegram/service"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
-	"github.com/google/uuid"
 	"github.com/hashicorp/golang-lru/v2/expirable"
+	"github.com/segmentio/ksuid"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
@@ -135,7 +135,7 @@ func (h msgHandler) convertToEvent(chanId int64, msg *client.Message) (evt *pb.C
 				src = ch.Link
 			}
 			evt = &pb.CloudEvent{
-				Id:          uuid.NewString(),
+				Id:          ksuid.New().String(),
 				Source:      src,
 				SpecVersion: attrValSpecVersion,
 				Type:        fmt.Sprintf(fmtAttrValType, h.indexShard),
