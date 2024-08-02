@@ -47,7 +47,7 @@ const (
 	FileTypeVideo
 )
 
-const fmtAttrValType = "com.awakari.source-telegram-%d.v1"
+const fmtAttrValType = "com_awakari_source_telegram_v1_%d"
 const attrValSpecVersion = "1.0"
 const attrKeyLatitude = "latitude"
 const attrKeyLongitude = "longitude"
