@@ -305,8 +305,6 @@ func (h msgHandler) getWriterAndPublish(chanId int64, evt *pb.CloudEvent) (err e
 		err = h.publish(w, evt)
 		switch {
 		case err == nil:
-		case errors.Is(err, limits.ErrReached):
-			fallthrough
 		case errors.Is(err, limits.ErrUnavailable):
 			fallthrough
 		case errors.Is(err, limits.ErrInternal):
@@ -381,9 +379,6 @@ func (h msgHandler) publish(w modelAwk.Writer[*pb.CloudEvent], evt *pb.CloudEven
 			b := backoff.NewExponentialBackOff()
 			b.InitialInterval = 100 * time.Millisecond
 			switch {
-			case errors.Is(err, limits.ErrReached):
-				// this error may be due to internal gRPC status "resource exhausted", try to reopen the writer
-				fallthrough
 			case errors.Is(err, limits.ErrUnavailable):
 				fallthrough
 			case errors.Is(err, permits.ErrUnavailable):
