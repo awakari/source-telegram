@@ -305,6 +305,10 @@ func (h msgHandler) getWriterAndPublish(chanId int64, evt *pb.CloudEvent) (err e
 		err = h.publish(w, evt)
 		switch {
 		case err == nil:
+		case errors.Is(err, limits.ErrReached):
+			h.log.Debug(fmt.Sprintf("Publish failure: evt.Id=%s, chanId=%d, err=%s", evt.Id, chanId, err))
+			err = nil   // don't retry this time
+			fallthrough // reopen the writer the next time
 		case errors.Is(err, limits.ErrUnavailable):
 			fallthrough
 		case errors.Is(err, limits.ErrInternal):
@@ -374,31 +378,20 @@ func (h msgHandler) publish(w modelAwk.Writer[*pb.CloudEvent], evt *pb.CloudEven
 			evt,
 		}
 		err = h.tryWriteEventOnce(w, evts)
-		if err != nil {
+		if err == errNoAck {
 			// retry with a backoff
 			b := backoff.NewExponentialBackOff()
 			b.InitialInterval = 100 * time.Millisecond
-			switch {
-			case errors.Is(err, limits.ErrUnavailable):
-				fallthrough
-			case errors.Is(err, permits.ErrUnavailable):
-				fallthrough
-			case errors.Is(err, resolver.ErrUnavailable):
-				fallthrough
-			case errors.Is(err, resolver.ErrInternal):
-				// avoid retrying this before reopening the writer
-			default:
-				b.MaxElapsedTime = 10 * time.Second
-				err = backoff.RetryNotify(
-					func() error {
-						return h.tryWriteEventOnce(w, evts)
-					},
-					b,
-					func(err error, d time.Duration) {
-						h.log.Warn(fmt.Sprintf("failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
-					},
-				)
-			}
+			b.MaxElapsedTime = 10 * time.Second
+			err = backoff.RetryNotify(
+				func() error {
+					return h.tryWriteEventOnce(w, evts)
+				},
+				b,
+				func(err error, d time.Duration) {
+					h.log.Warn(fmt.Sprintf("failed to write event %s, cause: %s, retrying in %s...", evt.Id, err, d))
+				},
+			)
 		}
 	}
 	return
