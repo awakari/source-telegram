@@ -5,12 +5,16 @@ import (
 	"context"
 	"fmt"
 	apiGrpc "github.com/awakari/source-telegram/api/grpc"
+	"github.com/awakari/source-telegram/api/grpc/queue"
 	"github.com/awakari/source-telegram/config"
 	"github.com/awakari/source-telegram/handler/message"
 	"github.com/awakari/source-telegram/handler/update"
 	"github.com/awakari/source-telegram/model"
 	"github.com/awakari/source-telegram/service"
 	"github.com/awakari/source-telegram/storage"
+	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -152,7 +156,18 @@ func main() {
 	chansJoined := map[int64]*model.Channel{}
 	chansJoinedLock := &sync.Mutex{}
 
-	svc := service.NewService(clientTg, stor, chansJoined, chansJoinedLock, log, replicaIndex)
+	tok := cfg.Api.Telegram.Bot.Token
+	tokParts := strings.SplitN(tok, ":", 2)
+	if len(tokParts) != 2 {
+		panic(fmt.Sprintf("invalid telegram bot token: %s", tok))
+	}
+	var botUserId int64
+	botUserId, err = strconv.ParseInt(tokParts[0], 10, 64)
+	if err != nil {
+		panic(err)
+	}
+
+	svc := service.NewService(clientTg, stor, chansJoined, chansJoinedLock, log, replicaIndex, botUserId)
 	svc = service.NewServiceLogging(svc, log)
 	go func() {
 		b := backoff.NewExponentialBackOff()
@@ -173,6 +188,54 @@ func main() {
 	log.Info(fmt.Sprintf("starting to listen the API @ port #%d...", cfg.Api.Port))
 	go apiGrpc.Serve(svc, cfg.Api.Port)
 
+	if replicaIndex == cfg.Api.Queue.ReplicaIndex {
+		// init queues
+		connQueue, err := grpc.NewClient(cfg.Api.Queue.Uri, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			panic(err)
+		}
+		log.Info("connected to the queue service")
+		clientQueue := queue.NewServiceClient(connQueue)
+		svcQueue := queue.NewService(clientQueue)
+		svcQueue = queue.NewLoggingMiddleware(svcQueue, log)
+		err = svcQueue.SetConsumer(context.TODO(), cfg.Api.Queue.InterestsCreated.Name, cfg.Api.Queue.InterestsCreated.Subj)
+		if err != nil {
+			panic(err)
+		}
+		log.Info(fmt.Sprintf("initialized the %s queue", cfg.Api.Queue.InterestsCreated.Name))
+		go func() {
+			err = consumeQueue(
+				context.Background(),
+				svc,
+				svcQueue,
+				cfg.Api.Queue.InterestsCreated.Name,
+				cfg.Api.Queue.InterestsCreated.Subj,
+				cfg.Api.Queue.InterestsCreated.BatchSize,
+			)
+			if err != nil {
+				panic(err)
+			}
+		}()
+		err = svcQueue.SetConsumer(context.TODO(), cfg.Api.Queue.InterestsUpdated.Name, cfg.Api.Queue.InterestsUpdated.Subj)
+		if err != nil {
+			panic(err)
+		}
+		log.Info(fmt.Sprintf("initialized the %s queue", cfg.Api.Queue.InterestsUpdated.Name))
+		go func() {
+			err = consumeQueue(
+				context.Background(),
+				svc,
+				svcQueue,
+				cfg.Api.Queue.InterestsUpdated.Name,
+				cfg.Api.Queue.InterestsUpdated.Subj,
+				cfg.Api.Queue.InterestsUpdated.BatchSize,
+			)
+			if err != nil {
+				panic(err)
+			}
+		}()
+	}
+
 	//
 	listener := clientTg.GetListener()
 	defer listener.Close()
@@ -191,4 +254,24 @@ func main() {
 		clientTg.Stop()
 		os.Exit(1)
 	}()
+}
+
+func consumeQueue(
+	ctx context.Context,
+	svc service.Service,
+	svcQueue queue.Service,
+	name, subj string,
+	batchSize uint32,
+) (err error) {
+	for {
+		err = svcQueue.ReceiveMessages(ctx, name, subj, batchSize, func(evts []*pb.CloudEvent) (err error) {
+			for _, evt := range evts {
+				_ = svc.HandleInterestChange(ctx, evt)
+			}
+			return
+		})
+		if err != nil {
+			panic(err)
+		}
+	}
 }

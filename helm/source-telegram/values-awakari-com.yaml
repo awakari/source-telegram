@@ -1,3 +1,5 @@
 api:
   writer:
     uri: "api:50051"
+queue:
+  replicaIndex: 1 # where to consume queue

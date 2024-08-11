@@ -98,3 +98,13 @@ db:
 log:
   # https://pkg.go.dev/golang.org/x/exp/slog#Level
   level: -4
+queue:
+  uri: "queue:50051"
+  interestsCreated:
+    batchSize: 1
+    name: "source-telegram"
+    subj: "interests-created"
+  interestsUpdated:
+    batchSize: 1
+    name: "source-telegram"
+    subj: "interests-updated"

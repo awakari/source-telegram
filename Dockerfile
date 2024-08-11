@@ -1,4 +1,4 @@
-FROM golang:1.22.5-alpine3.20 as go-builder
+FROM golang:1.22.6-alpine3.20 as go-builder
 
 ENV LANG en_US.UTF-8
 ENV TZ UTC
@@ -45,4 +45,5 @@ RUN apk upgrade --no-cache && \
 
 COPY --from=go-builder /src/source-telegram /bin/source-telegram
 COPY --from=go-builder /src/scripts/run.sh /bin/run.sh
+COPY logo.jpg /logo.jpg
 CMD ["/bin/run.sh"]

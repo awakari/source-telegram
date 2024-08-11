@@ -7,6 +7,7 @@ import (
 	"github.com/akurilov/go-tdlib/client"
 	"github.com/awakari/source-telegram/model"
 	"github.com/awakari/source-telegram/storage"
+	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ type Service interface {
 	Delete(ctx context.Context, link string) (err error)
 	GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error)
 	SearchAndAdd(ctx context.Context, groupId, subId, terms string, limit uint32) (n uint32, err error)
+	HandleInterestChange(ctx context.Context, evt *pb.CloudEvent) (err error)
 
 	RefreshJoinedLoop() (err error)
 }
@@ -31,12 +33,18 @@ type service struct {
 	chansJoinedLock *sync.Mutex
 	log             *slog.Logger
 	replicaIndex    int
+	botUserId       int64
 }
 
 const ListLimit = 1_000
 const RefreshInterval = 15 * time.Minute
 const minChanMemberCount = 2_345
 const TagNoBot = "#nobot"
+
+const ceKeyGroupId = "awakarigroupid"
+const ceKeyPublic = "public"
+const ceKeyQueriesBasic = "queriesbasic"
+const ceKeyDescription = "description"
 
 var ErrNoBot = fmt.Errorf("chat/message contains the %s tag", TagNoBot)
 
@@ -47,6 +55,7 @@ func NewService(
 	chansJoinedLock *sync.Mutex,
 	log *slog.Logger,
 	replicaIndex int,
+	botUserId int64,
 ) Service {
 	return service{
 		clientTg:        clientTg,
@@ -55,6 +64,7 @@ func NewService(
 		chansJoinedLock: chansJoinedLock,
 		log:             log,
 		replicaIndex:    replicaIndex,
+		botUserId:       botUserId,
 	}
 }
 
@@ -274,6 +284,159 @@ func (svc service) supergroupContainsNoBotTag(chId, sgId int64) (contains bool) 
 				break
 			}
 		}
+	}
+	return
+}
+
+func (svc service) HandleInterestChange(ctx context.Context, evt *pb.CloudEvent) (err error) {
+	var groupId string
+	if groupIdAttr, groupIdIdPresent := evt.Attributes[ceKeyGroupId]; groupIdIdPresent {
+		groupId = groupIdAttr.GetCeString()
+	}
+	if groupId == "" {
+		err = fmt.Errorf("interest %s event: empty group id, skipping", evt.GetTextData())
+		return
+	}
+	publicAttr, publicAttrPresent := evt.Attributes[ceKeyPublic]
+	if publicAttrPresent && publicAttr.GetCeBoolean() {
+		err = svc.handlePublicInterestChange(ctx, evt)
+	}
+	return
+}
+
+func (svc service) handlePublicInterestChange(ctx context.Context, evt *pb.CloudEvent) (err error) {
+
+	interestId := evt.GetTextData()
+	var descr string
+	if attrDescr, attrDescrPresent := evt.Attributes[ceKeyDescription]; attrDescrPresent {
+		descr = attrDescr.GetCeString()
+	}
+	var cats []string
+	if catsAttr, catsAttrPresent := evt.Attributes[ceKeyQueriesBasic]; catsAttrPresent {
+		cats = strings.Split(catsAttr.GetCeString(), "\n")
+	}
+	var tags []string
+	for _, cat := range cats {
+		if strings.HasPrefix(cat, "#") {
+			tags = append(tags, cat)
+		} else {
+			tags = append(tags, "#"+cat)
+		}
+	}
+	name := strings.ToLower(interestId)
+	name = strings.ReplaceAll(name, "-", "_")
+	if len(name) > 28 {
+		name = strings.ReplaceAll(name, "_", "")
+	}
+	if len(name) > 28 {
+		name = name[:28]
+	}
+	name = "awk_" + name
+
+	if exists, _ := svc.chanExistsPublic(name); !exists {
+		var c *client.Chat
+		c, err = svc.createChan(interestId, descr, tags)
+		if err == nil {
+			err = errors.Join(err, svc.setChanPublic(c, interestId, name))
+			err = errors.Join(err, svc.setChanLogo(c, interestId))
+			err = errors.Join(err, svc.setChanAdminBot(c, interestId))
+			err = errors.Join(err, svc.subscribeChan(c, interestId))
+		}
+	}
+
+	return
+}
+
+func (svc service) chanExistsPublic(name string) (exists bool, err error) {
+	var c *client.Chat
+	c, err = svc.clientTg.SearchPublicChat(&client.SearchPublicChatRequest{
+		Username: name,
+	})
+	exists = c != nil
+	return
+}
+
+func (svc service) createChan(interestId, descr string, tags []string) (c *client.Chat, err error) {
+	c, err = svc.clientTg.CreateNewSupergroupChat(&client.CreateNewSupergroupChatRequest{
+		Title:     descr,
+		IsChannel: true,
+		Description: fmt.Sprintf(
+			"Awakari Interest: %s\nDetails: https://awakari.com/sub-details.html?id=%s\n%s",
+			interestId, interestId, strings.Join(tags, " "),
+		),
+	})
+	if err != nil {
+		err = errors.Join(err, fmt.Errorf("failed to create a channel, interest=%s, err=%s", interestId, err))
+	}
+	return
+}
+
+func (svc service) setChanPublic(c *client.Chat, interestId, name string) (err error) {
+	sgChat := c.Type.(*client.ChatTypeSupergroup)
+	_, err = svc.clientTg.SetSupergroupUsername(&client.SetSupergroupUsernameRequest{
+		SupergroupId: sgChat.SupergroupId,
+		Username:     name,
+	})
+	if err != nil {
+		err = errors.Join(err, fmt.Errorf("failed to set a channel name, interest=%s, err=%s", interestId, err))
+	}
+	return
+}
+
+func (svc service) setChanLogo(c *client.Chat, interestId string) (err error) {
+	_, err = svc.clientTg.SetChatPhoto(&client.SetChatPhotoRequest{
+		ChatId: c.Id,
+		Photo: &client.InputChatPhotoStatic{
+			Photo: &client.InputFileLocal{
+				Path: "/logo.jpg",
+			},
+		},
+	})
+	if err != nil {
+		err = errors.Join(err, fmt.Errorf("failed to set the channel photo, interest=%s, err=%s", interestId, err))
+	}
+	return
+}
+
+func (svc service) setChanAdminBot(c *client.Chat, interestId string) (err error) {
+	_, err = svc.clientTg.SetChatMemberStatus(&client.SetChatMemberStatusRequest{
+		ChatId: c.Id,
+		MemberId: &client.MessageSenderUser{
+			UserId: svc.botUserId,
+		},
+		Status: &client.ChatMemberStatusAdministrator{
+			Rights: &client.ChatAdministratorRights{
+				CanPostMessages:   true,
+				CanEditMessages:   true,
+				CanDeleteMessages: true,
+				CanInviteUsers:    true,
+				CanPinMessages:    true,
+				CanPromoteMembers: true,
+			},
+		},
+	})
+	if err != nil {
+		err = errors.Join(err, fmt.Errorf("failed to add the bot to the channel, interest=%s, err=%s", interestId, err))
+	}
+	return
+}
+
+func (svc service) subscribeChan(c *client.Chat, interestId string) (err error) {
+	_, err = svc.clientTg.SendMessage(&client.SendMessageRequest{
+		ChatId: c.Id,
+		InputMessageContent: &client.InputMessageText{
+			Text: &client.FormattedText{
+				Text: fmt.Sprintf("/start %s", interestId),
+				Entities: []*client.TextEntity{
+					{
+						Type: &client.TextEntityTypeBotCommand{},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		err = errors.Join(err, fmt.Errorf("failed to send the channel message, interest=%s, chat=%d, err=%s", interestId, c.Id, err))
 	}
 	return
 }

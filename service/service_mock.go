@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/awakari/source-telegram/model"
 	"github.com/awakari/source-telegram/storage"
+	"github.com/cloudevents/sdk-go/binding/format/protobuf/v2/pb"
 )
 
 type serviceMock struct {
@@ -81,6 +82,11 @@ func (s serviceMock) SearchAndAdd(ctx context.Context, groupId, subId, terms str
 }
 
 func (s serviceMock) RefreshJoinedLoop() (err error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s serviceMock) HandleInterestChange(ctx context.Context, evt *pb.CloudEvent) (err error) {
 	//TODO implement me
 	panic("implement me")
 }
