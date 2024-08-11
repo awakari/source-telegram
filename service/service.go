@@ -333,26 +333,30 @@ func (svc service) handlePublicInterestChange(ctx context.Context, evt *pb.Cloud
 	}
 	name = "awk_" + name
 
-	if exists, _ := svc.chanExistsPublic(name); !exists {
-		var c *client.Chat
+	c, _ := svc.getPublicChan(name)
+	switch c {
+	case nil:
 		c, err = svc.createChan(interestId, descr, tags)
 		if err == nil {
 			err = errors.Join(err, svc.setChanPublic(c, interestId, name))
 			err = errors.Join(err, svc.setChanLogo(c, interestId))
-			err = errors.Join(err, svc.setChanAdminBot(c, interestId))
-			err = errors.Join(err, svc.subscribeChan(c, interestId))
 		}
+	}
+	if err == nil {
+		err = errors.Join(err, svc.setChanAdminBot(c, interestId))
+		err = errors.Join(err, svc.subscribeChan(c, interestId))
 	}
 
 	return
 }
 
-func (svc service) chanExistsPublic(name string) (exists bool, err error) {
-	var c *client.Chat
+func (svc service) getPublicChan(name string) (c *client.Chat, err error) {
 	c, err = svc.clientTg.SearchPublicChat(&client.SearchPublicChatRequest{
 		Username: name,
 	})
-	exists = c != nil
+	if err != nil || c.Type.ChatTypeType() != client.TypeChatTypeSupergroup || !c.Type.(*client.ChatTypeSupergroup).IsChannel {
+		c = nil
+	}
 	return
 }
 
