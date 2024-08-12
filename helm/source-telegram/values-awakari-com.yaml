@@ -2,4 +2,4 @@ api:
   writer:
     uri: "api:50051"
 queue:
-  replicaIndex: 1 # where to consume queue
+  replicaIndex: -1 # where to consume queue, -1 to disable completely

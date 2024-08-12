@@ -50,7 +50,7 @@ type ReplicaConfig struct {
 }
 
 type QueueConfig struct {
-	ReplicaIndex     int           `envconfig:"API_QUEUE_REPLICA_INDEX" default:"1"`
+	ReplicaIndex     int           `envconfig:"API_QUEUE_REPLICA_INDEX" default:"0"`
 	BackoffError     time.Duration `envconfig:"API_QUEUE_BACKOFF_ERROR" default:"1s" required:"true"`
 	Uri              string        `envconfig:"API_QUEUE_URI" default:"queue:50051" required:"true"`
 	InterestsCreated struct {
