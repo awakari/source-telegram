@@ -76,17 +76,14 @@ api:
   writer:
     uri: "resolver:50051"
 db:
-  protocol: mongodb
-  hostname: "mongodb:27017"
   # Database name to use.
   name: source
-  username: ""
-  password:
-    raw: "" # used if db.password.secret.enabled is false
-    secret:
-      enabled: false
-      name: "mongodb"
-      key: "mongodb-root-password"
+  secret:
+    name: "db-mongo"
+    keys:
+      url: "url"
+      username: "username"
+      password: "password"
   table:
     # Database table name to use.
     name: tgchans
