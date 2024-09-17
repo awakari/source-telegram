@@ -114,6 +114,10 @@ func main() {
 		panic(err)
 	}
 	//
+	c := apiGrpc.NewController(chCode, uint32(replicaIndex))
+	log.Info(fmt.Sprintf("starting to listen the API @ port #%d...", cfg.Api.Port))
+	go apiGrpc.Serve(c, cfg.Api.Port)
+	//
 	clientTg, err := client.NewClient(authorizer)
 	if err != nil {
 		panic(err)
@@ -169,6 +173,7 @@ func main() {
 
 	svc := service.NewService(clientTg, stor, chansJoined, chansJoinedLock, log, replicaIndex, botUserId)
 	svc = service.NewServiceLogging(svc, log)
+	c.SetService(svc)
 	go func() {
 		b := backoff.NewExponentialBackOff()
 		_ = backoff.RetryNotify(svc.RefreshJoinedLoop, b, func(err error, d time.Duration) {
@@ -184,9 +189,6 @@ func main() {
 	//go func() {
 	//	_ = http.ListenAndServe("localhost:6060", nil)
 	//}()
-
-	log.Info(fmt.Sprintf("starting to listen the API @ port #%d...", cfg.Api.Port))
-	go apiGrpc.Serve(svc, cfg.Api.Port, chCode, uint32(replicaIndex))
 
 	if replicaIndex == cfg.Api.Queue.ReplicaIndex {
 		// init queues

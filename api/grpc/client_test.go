@@ -24,8 +24,10 @@ var chCode = make(chan string)
 func TestMain(m *testing.M) {
 	svc := service.NewServiceMock()
 	svc = service.NewServiceLogging(svc, log)
+	c := NewController(chCode, 1)
+	c.SetService(svc)
 	go func() {
-		err := Serve(svc, port, chCode, 1)
+		err := Serve(c, port)
 		if err != nil {
 			log.Error(err.Error())
 		}

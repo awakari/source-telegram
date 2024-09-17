@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/awakari/source-telegram/model"
 	"github.com/awakari/source-telegram/service"
 	"github.com/awakari/source-telegram/storage"
@@ -12,23 +13,35 @@ import (
 	"time"
 )
 
+type Controller interface {
+	SetService(svc service.Service)
+	ServiceServer
+}
+
 type controller struct {
 	svc        service.Service
 	chCode     chan string
 	replicaIdx uint32
 }
 
-func NewController(svc service.Service, chCode chan string, replicaIdx uint32) ServiceServer {
-	return controller{
-		svc:        svc,
+func NewController(chCode chan string, replicaIdx uint32) Controller {
+	return &controller{
 		replicaIdx: replicaIdx,
 		chCode:     chCode,
 	}
 }
 
-func (c controller) Create(ctx context.Context, req *CreateRequest) (resp *CreateResponse, err error) {
+func (c *controller) SetService(svc service.Service) {
+	c.svc = svc
+	return
+}
+
+func (c *controller) Create(ctx context.Context, req *CreateRequest) (resp *CreateResponse, err error) {
 	resp = &CreateResponse{}
-	if req.Channel == nil {
+	if c.svc == nil {
+		err = status.Error(codes.FailedPrecondition, "service not initialized")
+	}
+	if err == nil && req.Channel == nil {
 		err = status.Error(codes.InvalidArgument, "channel payload is missing")
 	}
 	if err == nil {
@@ -47,10 +60,15 @@ func (c controller) Create(ctx context.Context, req *CreateRequest) (resp *Creat
 	return
 }
 
-func (c controller) Read(ctx context.Context, req *ReadRequest) (resp *ReadResponse, err error) {
+func (c *controller) Read(ctx context.Context, req *ReadRequest) (resp *ReadResponse, err error) {
 	resp = &ReadResponse{}
+	if c.svc == nil {
+		err = status.Error(codes.FailedPrecondition, "service not initialized")
+	}
 	var ch model.Channel
-	ch, err = c.svc.Read(ctx, req.Link)
+	if err == nil {
+		ch, err = c.svc.Read(ctx, req.Link)
+	}
 	switch err {
 	case nil:
 		resp.Channel = &Channel{
@@ -75,31 +93,41 @@ func (c controller) Read(ctx context.Context, req *ReadRequest) (resp *ReadRespo
 	return
 }
 
-func (c controller) Delete(ctx context.Context, req *DeleteRequest) (resp *DeleteResponse, err error) {
+func (c *controller) Delete(ctx context.Context, req *DeleteRequest) (resp *DeleteResponse, err error) {
 	resp = &DeleteResponse{}
-	err = c.svc.Delete(ctx, req.Link)
-	err = encodeError(err)
+	if c.svc == nil {
+		err = status.Error(codes.FailedPrecondition, "service not initialized")
+	}
+	if err == nil {
+		err = c.svc.Delete(ctx, req.Link)
+		err = encodeError(err)
+	}
 	return
 }
 
-func (c controller) List(ctx context.Context, req *ListRequest) (resp *ListResponse, err error) {
+func (c *controller) List(ctx context.Context, req *ListRequest) (resp *ListResponse, err error) {
 	resp = &ListResponse{}
-	filter := model.ChannelFilter{}
-	if req.Filter != nil {
-		filter.GroupId = req.Filter.GroupId
-		filter.UserId = req.Filter.UserId
-		filter.Pattern = req.Filter.Pattern
-		filter.SubId = req.Filter.SubId
-	}
-	var order model.Order
-	switch req.Order {
-	case Order_DESC:
-		order = model.OrderDesc
-	default:
-		order = model.OrderAsc
+	if c.svc == nil {
+		err = status.Error(codes.FailedPrecondition, "service not initialized")
 	}
 	var page []model.Channel
-	page, err = c.svc.GetPage(ctx, filter, req.Limit, req.Cursor, order)
+	if err == nil {
+		filter := model.ChannelFilter{}
+		if req.Filter != nil {
+			filter.GroupId = req.Filter.GroupId
+			filter.UserId = req.Filter.UserId
+			filter.Pattern = req.Filter.Pattern
+			filter.SubId = req.Filter.SubId
+		}
+		var order model.Order
+		switch req.Order {
+		case Order_DESC:
+			order = model.OrderDesc
+		default:
+			order = model.OrderAsc
+		}
+		page, err = c.svc.GetPage(ctx, filter, req.Limit, req.Cursor, order)
+	}
 	if len(page) > 0 {
 		for _, ch := range page {
 			resp.Page = append(resp.Page, &Channel{
@@ -115,17 +143,23 @@ func (c controller) List(ctx context.Context, req *ListRequest) (resp *ListRespo
 	return
 }
 
-func (c controller) SearchAndAdd(ctx context.Context, req *SearchAndAddRequest) (resp *SearchAndAddResponse, err error) {
+func (c *controller) SearchAndAdd(ctx context.Context, req *SearchAndAddRequest) (resp *SearchAndAddResponse, err error) {
 	resp = &SearchAndAddResponse{}
-	resp.CountAdded, err = c.svc.SearchAndAdd(ctx, req.GroupId, req.SubId, req.Terms, req.Limit)
-	err = encodeError(err)
+	if c.svc == nil {
+		err = status.Error(codes.FailedPrecondition, "service not initialized")
+	}
+	if err == nil {
+		resp.CountAdded, err = c.svc.SearchAndAdd(ctx, req.GroupId, req.SubId, req.Terms, req.Limit)
+		err = encodeError(err)
+	}
 	return
 }
 
-func (c controller) Login(ctx context.Context, req *LoginRequest) (resp *LoginResponse, err error) {
+func (c *controller) Login(ctx context.Context, req *LoginRequest) (resp *LoginResponse, err error) {
 	resp = &LoginResponse{}
 	if req.ReplicaIndex == c.replicaIdx {
 		resp.ReplicaMatch = true
+		fmt.Printf("Login(%s)\n", req.Code)
 		select {
 		case c.chCode <- req.Code:
 			resp.Success = true
@@ -151,6 +185,8 @@ func encodeError(src error) (dst error) {
 		dst = status.Error(codes.DeadlineExceeded, src.Error())
 	case errors.Is(src, context.Canceled):
 		dst = status.Error(codes.Canceled, src.Error())
+	case status.Code(src) == codes.FailedPrecondition:
+		dst = src
 	default:
 		dst = status.Error(codes.Unknown, src.Error())
 	}
