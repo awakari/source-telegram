@@ -39,7 +39,7 @@ func main() {
 	slog.Info("starting...")
 	cfg, err := config.NewConfigFromEnv()
 	if err != nil {
-		slog.Error("failed to load the config", err)
+		slog.Error(fmt.Sprintf("failed to load the config: %s", err))
 	}
 	opts := slog.HandlerOptions{
 		Level: slog.Level(cfg.Log.Level),
@@ -186,7 +186,7 @@ func main() {
 	//}()
 
 	log.Info(fmt.Sprintf("starting to listen the API @ port #%d...", cfg.Api.Port))
-	go apiGrpc.Serve(svc, cfg.Api.Port)
+	go apiGrpc.Serve(svc, cfg.Api.Port, chCode, uint32(replicaIndex))
 
 	if replicaIndex == cfg.Api.Queue.ReplicaIndex {
 		// init queues

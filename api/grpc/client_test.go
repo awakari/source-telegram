@@ -19,13 +19,15 @@ var port uint16 = 50051
 
 var log = slog.Default()
 
+var chCode = make(chan string)
+
 func TestMain(m *testing.M) {
 	svc := service.NewServiceMock()
 	svc = service.NewServiceLogging(svc, log)
 	go func() {
-		err := Serve(svc, port)
+		err := Serve(svc, port, chCode, 1)
 		if err != nil {
-			log.Error("", err)
+			log.Error(err.Error())
 		}
 	}()
 	code := m.Run()
@@ -35,7 +37,7 @@ func TestMain(m *testing.M) {
 func TestServiceClient_Create(t *testing.T) {
 	//
 	addr := fmt.Sprintf("localhost:%d", port)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.Nil(t, err)
 	client := NewServiceClient(conn)
 	//
@@ -100,7 +102,7 @@ func TestServiceClient_Create(t *testing.T) {
 func TestServiceClient_Read(t *testing.T) {
 	//
 	addr := fmt.Sprintf("localhost:%d", port)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.Nil(t, err)
 	client := NewServiceClient(conn)
 	//
@@ -147,7 +149,7 @@ func TestServiceClient_Read(t *testing.T) {
 func TestServiceClient_Delete(t *testing.T) {
 	//
 	addr := fmt.Sprintf("localhost:%d", port)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.Nil(t, err)
 	client := NewServiceClient(conn)
 	//
@@ -182,7 +184,7 @@ func TestServiceClient_Delete(t *testing.T) {
 func TestServiceClient_List(t *testing.T) {
 	//
 	addr := fmt.Sprintf("localhost:%d", port)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.Nil(t, err)
 	client := NewServiceClient(conn)
 	//
@@ -217,7 +219,7 @@ func TestServiceClient_List(t *testing.T) {
 func TestServiceClient_SearchAndAdd(t *testing.T) {
 	//
 	addr := fmt.Sprintf("localhost:%d", port)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.Nil(t, err)
 	client := NewServiceClient(conn)
 	//
@@ -250,4 +252,45 @@ func TestServiceClient_SearchAndAdd(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestServiceClient_Login(t *testing.T) {
+	//
+	addr := fmt.Sprintf("localhost:%d", port)
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.Nil(t, err)
+	client := NewServiceClient(conn)
+	//
+	cases := map[string]struct {
+		code         string
+		replicaIdx   uint32
+		success      bool
+		replicaMatch bool
+		err          error
+	}{
+		"ok but no match": {
+			code: "12345",
+		},
+		"ok and match": {
+			code:         "12345",
+			replicaIdx:   1,
+			replicaMatch: true,
+		},
+	}
+	//
+	for k, c := range cases {
+		t.Run(k, func(t *testing.T) {
+			var resp *LoginResponse
+			resp, err = client.Login(context.TODO(), &LoginRequest{
+				Code:         c.code,
+				ReplicaIndex: c.replicaIdx,
+			})
+			assert.ErrorIs(t, err, c.err)
+			if c.err == nil {
+				assert.Equal(t, c.success, resp.Success)
+				assert.Equal(t, c.replicaMatch, resp.ReplicaMatch)
+			}
+		})
+	}
+
 }

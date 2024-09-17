@@ -12,6 +12,8 @@ service Service {
   rpc Delete(DeleteRequest) returns (DeleteResponse);
   rpc List(ListRequest) returns (ListResponse);
   rpc SearchAndAdd(SearchAndAddRequest) returns (SearchAndAddResponse);
+
+  rpc Login(LoginRequest) returns (LoginResponse);
 }
 
 message CreateRequest {
@@ -79,4 +81,14 @@ message SearchAndAddRequest {
 
 message SearchAndAddResponse {
   uint32 countAdded = 1;
+}
+
+message LoginRequest {
+  string code = 1;
+  uint32 replicaIndex = 2;
+}
+
+message LoginResponse {
+  bool success = 1;
+  bool replicaMatch = 2;
 }

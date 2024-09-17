@@ -10,9 +10,9 @@ import (
 	"net"
 )
 
-func Serve(svc service.Service, port uint16) (err error) {
+func Serve(svc service.Service, port uint16, chCode chan string, replicaIdx uint32) (err error) {
 	srv := grpc.NewServer()
-	c := NewController(svc)
+	c := NewController(svc, chCode, replicaIdx)
 	RegisterServiceServer(srv, c)
 	reflection.Register(srv)
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())

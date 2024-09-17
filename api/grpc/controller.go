@@ -13,12 +13,16 @@ import (
 )
 
 type controller struct {
-	svc service.Service
+	svc        service.Service
+	chCode     chan string
+	replicaIdx uint32
 }
 
-func NewController(svc service.Service) ServiceServer {
+func NewController(svc service.Service, chCode chan string, replicaIdx uint32) ServiceServer {
 	return controller{
-		svc: svc,
+		svc:        svc,
+		replicaIdx: replicaIdx,
+		chCode:     chCode,
 	}
 }
 
@@ -115,6 +119,20 @@ func (c controller) SearchAndAdd(ctx context.Context, req *SearchAndAddRequest) 
 	resp = &SearchAndAddResponse{}
 	resp.CountAdded, err = c.svc.SearchAndAdd(ctx, req.GroupId, req.SubId, req.Terms, req.Limit)
 	err = encodeError(err)
+	return
+}
+
+func (c controller) Login(ctx context.Context, req *LoginRequest) (resp *LoginResponse, err error) {
+	resp = &LoginResponse{}
+	if req.ReplicaIndex == c.replicaIdx {
+		resp.ReplicaMatch = true
+		select {
+		case c.chCode <- req.Code:
+			resp.Success = true
+		default:
+			resp.Success = false // doesn't accept anymore
+		}
+	}
 	return
 }
 

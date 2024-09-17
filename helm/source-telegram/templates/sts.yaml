@@ -101,7 +101,7 @@ spec:
             - name: API_TELEGRAM_BOT_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: "bot-telegram-tokens"
+                  name: "bot-telegram"
                   key: telegram
           stdin: true
           tty: true
