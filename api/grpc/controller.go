@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/awakari/source-telegram/model"
 	"github.com/awakari/source-telegram/service"
 	"github.com/awakari/source-telegram/storage"
@@ -19,15 +18,13 @@ type Controller interface {
 }
 
 type controller struct {
-	svc        service.Service
-	chCode     chan string
-	replicaIdx uint32
+	svc    service.Service
+	chCode chan string
 }
 
-func NewController(chCode chan string, replicaIdx uint32) Controller {
+func NewController(chCode chan string) Controller {
 	return &controller{
-		replicaIdx: replicaIdx,
-		chCode:     chCode,
+		chCode: chCode,
 	}
 }
 
@@ -157,15 +154,11 @@ func (c *controller) SearchAndAdd(ctx context.Context, req *SearchAndAddRequest)
 
 func (c *controller) Login(ctx context.Context, req *LoginRequest) (resp *LoginResponse, err error) {
 	resp = &LoginResponse{}
-	if req.ReplicaIndex == c.replicaIdx {
-		resp.ReplicaMatch = true
-		fmt.Printf("Login(%s)\n", req.Code)
-		select {
-		case c.chCode <- req.Code:
-			resp.Success = true
-		default:
-			resp.Success = false // doesn't accept anymore
-		}
+	select {
+	case c.chCode <- req.Code:
+		resp.Success = true
+	default:
+		resp.Success = false // doesn't accept anymore
 	}
 	return
 }

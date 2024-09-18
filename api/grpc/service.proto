@@ -85,10 +85,8 @@ message SearchAndAddResponse {
 
 message LoginRequest {
   string code = 1;
-  uint32 replicaIndex = 2;
 }
 
 message LoginResponse {
   bool success = 1;
-  bool replicaMatch = 2;
 }

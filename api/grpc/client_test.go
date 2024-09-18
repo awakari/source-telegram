@@ -24,7 +24,7 @@ var chCode = make(chan string)
 func TestMain(m *testing.M) {
 	svc := service.NewServiceMock()
 	svc = service.NewServiceLogging(svc, log)
-	c := NewController(chCode, 1)
+	c := NewController(chCode)
 	c.SetService(svc)
 	go func() {
 		err := Serve(c, port)
@@ -273,24 +273,17 @@ func TestServiceClient_Login(t *testing.T) {
 		"ok but no match": {
 			code: "12345",
 		},
-		"ok and match": {
-			code:         "12345",
-			replicaIdx:   1,
-			replicaMatch: true,
-		},
 	}
 	//
 	for k, c := range cases {
 		t.Run(k, func(t *testing.T) {
 			var resp *LoginResponse
 			resp, err = client.Login(context.TODO(), &LoginRequest{
-				Code:         c.code,
-				ReplicaIndex: c.replicaIdx,
+				Code: c.code,
 			})
 			assert.ErrorIs(t, err, c.err)
 			if c.err == nil {
 				assert.Equal(t, c.success, resp.Success)
-				assert.Equal(t, c.replicaMatch, resp.ReplicaMatch)
 			}
 		})
 	}

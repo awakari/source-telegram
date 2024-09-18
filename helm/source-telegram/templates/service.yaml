@@ -1,7 +1,9 @@
+{{- $fullName := include "source-telegram.fullname" . }}
+
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "source-telegram.fullname" . }}
+  name: {{ $fullName }}
   labels:
     {{- include "source-telegram.labels" . | nindent 4 }}
 spec:
@@ -17,3 +19,26 @@ spec:
       name: grpc
   selector:
     {{- include "source-telegram.selectorLabels" . | nindent 4 }}
+
+---
+{{- $replicas := .Values.replicaCount | int }}
+
+{{- range $i := until $replicas }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-{{ $i }}
+  labels:
+    app: {{ $fullName }}
+    replica: "{{ $i }}"
+spec:
+  ports:
+    - port: {{ .Values.service.portGrpc }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+  selector:
+    app: {{ $fullName }}
+    statefulset.kubernetes.io/pod-name: {{ $fullName }}-{{ $i }}
+---
+{{- end }}

@@ -114,7 +114,7 @@ func main() {
 		panic(err)
 	}
 	//
-	c := apiGrpc.NewController(chCode, uint32(replicaIndex))
+	c := apiGrpc.NewController(chCode)
 	log.Info(fmt.Sprintf("starting to listen the API @ port #%d...", cfg.Api.Port))
 	go apiGrpc.Serve(c, cfg.Api.Port)
 	//
