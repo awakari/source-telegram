@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	apiGrpc "github.com/awakari/source-telegram/api/grpc"
@@ -46,25 +45,6 @@ func main() {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stdout, &opts))
 
-	// init the Telegram client
-	authorizer := client.ClientAuthorizer()
-	chCode := make(chan string)
-	go func() {
-		var tgCodeIn *os.File
-		tgCodeIn, err = os.OpenFile("tgcodein", os.O_RDONLY, os.ModeNamedPipe)
-		if err != nil {
-			panic(err)
-		}
-		defer tgCodeIn.Close()
-		tgCodeInReader := bufio.NewReader(tgCodeIn)
-		var line string
-		line, err = tgCodeInReader.ReadString('\n')
-		if err != nil {
-			panic(err)
-		}
-		chCode <- line
-	}()
-
 	// determine the replica index
 	replicaNameParts := strings.Split(cfg.Replica.Name, "-")
 	if len(replicaNameParts) < 2 {
@@ -89,7 +69,10 @@ func main() {
 	if len(cfg.Api.Telegram.Phones) <= replicaIndex {
 		panic("Not enough phone numbers, decrease the replica count or fix the config")
 	}
-	//
+
+	// init the Telegram client
+	authorizer := client.ClientAuthorizer()
+	chCode := make(chan string)
 	go client.NonInteractiveCredentialsProvider(authorizer, cfg.Api.Telegram.Phones[replicaIndex], cfg.Api.Telegram.Password, chCode)
 	authorizer.TdlibParameters <- &client.SetTdlibParametersRequest{
 		//
