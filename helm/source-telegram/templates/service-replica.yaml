@@ -1,0 +1,23 @@
+{{- $fullName := include "source-telegram.fullname" . }}
+{{- $portGrpc := .Values.service.portGrpc }}
+{{- $replicas := .Values.replicaCount | int }}
+
+{{- range $i,$e := until $replicas }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-{{ $i }}
+  labels:
+    app: {{ $fullName }}
+    replica: "{{ $i }}"
+spec:
+  ports:
+    - port: {{ $portGrpc }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+  selector:
+    app: {{ $fullName }}
+    statefulset.kubernetes.io/pod-name: {{ $fullName }}-{{ $i }}
+{{- end }}
