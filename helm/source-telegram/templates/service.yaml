@@ -1,4 +1,5 @@
 {{- $fullName := include "source-telegram.fullname" . }}
+{{- $portGrpc := .Values.service.portGrpc }}
 
 apiVersion: v1
 kind: Service
@@ -13,7 +14,7 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
-    - port: {{ .Values.service.portGrpc }}
+    - port: {{ $portGrpc }}
       targetPort: grpc
       protocol: TCP
       name: grpc
@@ -33,7 +34,7 @@ metadata:
     replica: "{{ $i }}"
 spec:
   ports:
-    - port: {{ .Values.service.portGrpc }}
+    - port: {{ $portGrpc }}
       targetPort: grpc
       protocol: TCP
       name: grpc
