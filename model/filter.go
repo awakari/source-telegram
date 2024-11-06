@@ -5,5 +5,5 @@ type ChannelFilter struct {
 	UserId  string
 	Pattern string
 	SubId   string
-	Label   string
+	Label   *string
 }

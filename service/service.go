@@ -129,9 +129,11 @@ func (svc service) refreshJoined(ctx context.Context) (err error) {
 		svc.log.Debug(fmt.Sprintf("Refresh joined channels: got %d from the client", len(chatsJoined.ChatIds)))
 		//
 		var chanFilter model.ChannelFilter
+		var lbl string
 		if svc.replicaIndex > 0 {
-			chanFilter.Label = strconv.Itoa(svc.replicaIndex)
+			lbl = strconv.Itoa(svc.replicaIndex)
 		}
+		chanFilter.Label = &lbl
 		chans, err = svc.stor.GetPage(ctx, chanFilter, ListLimit, "", model.OrderAsc) // it's important to get all at once
 	}
 	if err == nil {

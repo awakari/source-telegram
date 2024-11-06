@@ -288,13 +288,16 @@ func (sm storageMongo) Delete(ctx context.Context, link string) (err error) {
 
 func (sm storageMongo) GetPage(ctx context.Context, filter model.ChannelFilter, limit uint32, cursor string, order model.Order) (page []model.Channel, err error) {
 	q := bson.M{}
-	switch filter.Label {
-	case "":
-		q[attrLabel] = bson.M{
-			"$exists": false,
+	lbl := filter.Label
+	if lbl != nil {
+		switch *lbl {
+		case "":
+			q[attrLabel] = bson.M{
+				"$exists": false,
+			}
+		default:
+			q[attrLabel] = filter.Label
 		}
-	default:
-		q[attrLabel] = filter.Label
 	}
 	if filter.UserId != "" {
 		q[attrGroupId] = filter.GroupId

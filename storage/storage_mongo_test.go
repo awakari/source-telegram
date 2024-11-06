@@ -297,6 +297,8 @@ func TestStorageMongo_GetPage(t *testing.T) {
 		require.Nil(t, err)
 	}
 	//
+	lbl0 := ""
+	lbl1 := "1"
 	cases := map[string]struct {
 		filter model.ChannelFilter
 		limit  uint32
@@ -309,7 +311,9 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			limit: 10,
 			page: []int64{
 				ids[0],
+				ids[1],
 				ids[2],
+				ids[3],
 				ids[4],
 			},
 		},
@@ -321,11 +325,12 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			page: []int64{
 				ids[0],
 				ids[2],
+				ids[3],
 			},
 		},
 		"filter": {
 			filter: model.ChannelFilter{
-				Label: "1",
+				Label: &lbl1,
 			},
 			limit: 10,
 			page: []int64{
@@ -333,11 +338,22 @@ func TestStorageMongo_GetPage(t *testing.T) {
 				ids[3],
 			},
 		},
+		"filter empty label": {
+			filter: model.ChannelFilter{
+				Label: &lbl0,
+			},
+			limit: 10,
+			page: []int64{
+				ids[0],
+				ids[2],
+				ids[4],
+			},
+		},
 		"limit": {
 			limit: 2,
 			page: []int64{
 				ids[0],
-				ids[2],
+				ids[1],
 			},
 		},
 		"cursor asc": {
@@ -345,6 +361,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			cursor: fmt.Sprintf("https://t.me/c/%s/123", strconv.FormatInt(-ids[1], 10)),
 			page: []int64{
 				ids[2],
+				ids[3],
 				ids[4],
 			},
 		},
@@ -354,7 +371,7 @@ func TestStorageMongo_GetPage(t *testing.T) {
 			order:  model.OrderDesc,
 			page: []int64{
 				ids[2],
-				ids[0],
+				ids[1],
 			},
 		},
 		"end of results": {
