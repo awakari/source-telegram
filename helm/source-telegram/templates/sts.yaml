@@ -103,6 +103,11 @@ spec:
                 secretKeyRef:
                   name: "bot-telegram"
                   key: telegram
+            - name: API_TOKEN_INTERNAL
+              valueFrom:
+                secretKeyRef:
+                  key: "{{ .Values.api.token.internal.key }}"
+                  name: "{{ .Values.api.token.internal.name }}"
           stdin: true
           tty: true
           securityContext:

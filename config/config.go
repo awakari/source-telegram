@@ -18,7 +18,10 @@ type Config struct {
 			}
 		}
 		Writer struct {
-			Uri string `envconfig:"API_WRITER_URI" default:"resolver:50051" required:"true"`
+			Uri string `envconfig:"API_WRITER_URI" default:"http://pub:8080/v1" required:"true"`
+		}
+		Token struct {
+			Internal string `envconfig:"API_TOKEN_INTERNAL" required:"true"`
 		}
 		Queue QueueConfig
 	}

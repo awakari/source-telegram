@@ -1,11 +1,10 @@
 package handler
 
 import (
+	"context"
 	"github.com/akurilov/go-tdlib/client"
-	"io"
 )
 
 type Handler[U client.Type] interface {
-	io.Closer
-	Handle(u U) (err error)
+	Handle(ctx context.Context, u U) (err error)
 }

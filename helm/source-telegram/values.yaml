@@ -74,7 +74,11 @@ tolerations: []
 
 api:
   writer:
-    uri: "resolver:50051"
+    uri: "http://pub:8080/v1"
+  token:
+    internal:
+      key: "api-token-internal"
+      name: "auth"
 db:
   # Database name to use.
   name: source

@@ -19,6 +19,7 @@ func TestConfig(t *testing.T) {
 	os.Setenv("API_TELEGRAM_IDS", "123,456,789")
 	os.Setenv("API_TELEGRAM_HASHES", "deadcode,cafebeef")
 	os.Setenv("API_TELEGRAM_PHONES", "1234,5678")
+	os.Setenv("API_TOKEN_INTERNAL", "foo")
 	cfg, err := NewConfigFromEnv()
 	assert.Nil(t, err)
 	assert.Equal(t, "writer:56789", cfg.Api.Writer.Uri)

@@ -5,7 +5,7 @@ package awakari.queue;
 option go_package = "github.com/awakari/source-telegram/api/grpc/queue";
 
 import "google/protobuf/empty.proto";
-import "api/grpc/cloudevents/cloudevent.proto";
+import "api/grpc/ce/cloudevents.proto";
 
 service Service {
 

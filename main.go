@@ -5,6 +5,7 @@ import (
 	"fmt"
 	apiGrpc "github.com/awakari/source-telegram/api/grpc"
 	"github.com/awakari/source-telegram/api/grpc/queue"
+	"github.com/awakari/source-telegram/api/http/pub"
 	"github.com/awakari/source-telegram/config"
 	"github.com/awakari/source-telegram/handler/message"
 	"github.com/awakari/source-telegram/handler/update"
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -24,7 +26,6 @@ import (
 	"time"
 
 	"github.com/akurilov/go-tdlib/client"
-	"github.com/awakari/client-sdk-go/api"
 	"github.com/cenkalti/backoff/v4"
 	//_ "net/http/pprof"
 )
@@ -128,18 +129,6 @@ func main() {
 	stor = storage.NewStorageLogging(stor, log)
 	defer stor.Close()
 
-	// init the Awakari writer
-	var clientAwk api.Client
-	clientAwk, err = api.
-		NewClientBuilder().
-		WriterUri(cfg.Api.Writer.Uri).
-		Build()
-	if err != nil {
-		panic(fmt.Sprintf("failed to initialize the Awakari API client: %s", err))
-	}
-	log.Info("initialized the Awakari API client")
-	defer clientAwk.Close()
-
 	chansJoined := map[int64]*model.Channel{}
 	chansJoinedLock := &sync.Mutex{}
 
@@ -164,9 +153,11 @@ func main() {
 		})
 	}()
 
+	svcPub := pub.NewService(http.DefaultClient, cfg.Api.Writer.Uri, cfg.Api.Token.Internal)
+	svcPub = pub.NewLogging(svcPub, log)
+
 	// init handlers
-	msgHandler := message.NewHandler(clientAwk, clientTg, chansJoined, chansJoinedLock, log, replicaIndex)
-	defer msgHandler.Close()
+	msgHandler := message.NewHandler(svcPub, clientTg, chansJoined, chansJoinedLock, log, replicaIndex)
 
 	// expose the profiling
 	//go func() {
@@ -225,8 +216,7 @@ func main() {
 	listener := clientTg.GetListener()
 	defer listener.Close()
 	h := update.NewHandler(listener, msgHandler, log)
-	defer h.Close()
-	err = h.Listen()
+	err = h.Listen(context.Background())
 	if err != nil {
 		panic(err)
 	}
