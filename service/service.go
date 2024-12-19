@@ -27,18 +27,18 @@ type Service interface {
 }
 
 type service struct {
-	clientTg        *client.Client
-	stor            storage.Storage
-	chansJoined     map[int64]*model.Channel
-	chansJoinedLock *sync.Mutex
-	log             *slog.Logger
-	replicaIndex    int
-	botUserId       int64
+	clientTg                  *client.Client
+	stor                      storage.Storage
+	chansJoined               map[int64]*model.Channel
+	chansJoinedLock           *sync.Mutex
+	log                       *slog.Logger
+	replicaIndex              int
+	botUserId                 int64
+	refreshJoinedInterval     time.Duration
+	searchChanMembersCountMin int32
 }
 
 const ListLimit = 1_000
-const RefreshInterval = 15 * time.Minute
-const minChanMemberCount = 2_345
 const TagNoBot = "#nobot"
 
 const ceKeyGroupId = "awakarigroupid"
@@ -56,15 +56,19 @@ func NewService(
 	log *slog.Logger,
 	replicaIndex int,
 	botUserId int64,
+	refreshJoinedInterval time.Duration,
+	searchChanMembersCountMin int32,
 ) Service {
 	return service{
-		clientTg:        clientTg,
-		stor:            stor,
-		chansJoined:     chansJoined,
-		chansJoinedLock: chansJoinedLock,
-		log:             log,
-		replicaIndex:    replicaIndex,
-		botUserId:       botUserId,
+		clientTg:                  clientTg,
+		stor:                      stor,
+		chansJoined:               chansJoined,
+		chansJoinedLock:           chansJoinedLock,
+		log:                       log,
+		replicaIndex:              replicaIndex,
+		botUserId:                 botUserId,
+		refreshJoinedInterval:     refreshJoinedInterval,
+		searchChanMembersCountMin: searchChanMembersCountMin,
 	}
 }
 
@@ -112,7 +116,7 @@ func (svc service) RefreshJoinedLoop() (err error) {
 	for err == nil {
 		err = svc.refreshJoined(ctx)
 		if err == nil {
-			time.Sleep(RefreshInterval)
+			time.Sleep(svc.refreshJoinedInterval)
 		}
 	}
 	return
@@ -234,7 +238,7 @@ func (svc service) SearchAndAdd(ctx context.Context, groupId, subId, terms strin
 				if sg.Usernames != nil && len(sg.Usernames.ActiveUsernames) > 0 {
 					name = sg.Usernames.ActiveUsernames[0]
 				}
-				if name != "" && sg.MemberCount > minChanMemberCount {
+				if name != "" && sg.MemberCount > svc.searchChanMembersCountMin {
 					now := time.Now().UTC()
 					chatErr = svc.stor.Create(ctx, model.Channel{
 						Id:      chatId,

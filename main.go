@@ -143,7 +143,17 @@ func main() {
 		panic(err)
 	}
 
-	svc := service.NewService(clientTg, stor, chansJoined, chansJoinedLock, log, replicaIndex, botUserId)
+	svc := service.NewService(
+		clientTg,
+		stor,
+		chansJoined,
+		chansJoinedLock,
+		log,
+		replicaIndex,
+		botUserId,
+		cfg.Db.Table.RefreshInterval,
+		cfg.Search.ChanMembersCountMin,
+	)
 	svc = service.NewServiceLogging(svc, log)
 	c.SetService(svc)
 	go func() {

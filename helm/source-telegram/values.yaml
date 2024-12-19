@@ -93,6 +93,8 @@ db:
     name: tgchans
     retention: "2160h" # 90 days
     shard: true
+    refresh:
+      interval: "15m"
   tls:
     enabled: false
     insecure: false
@@ -109,3 +111,5 @@ queue:
     batchSize: 1
     name: "source-telegram"
     subj: "interests-updated"
+search:
+  chan_members_count_min: 12345

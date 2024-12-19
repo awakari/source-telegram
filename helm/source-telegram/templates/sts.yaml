@@ -108,6 +108,10 @@ spec:
                 secretKeyRef:
                   key: "{{ .Values.api.token.internal.key }}"
                   name: "{{ .Values.api.token.internal.name }}"
+            - name: DB_TABLE_REFRESH_INTERVAL
+              value: "{{ .Values.db.table.refresh.interval }}"
+            - name: SEARCH_CHAN_MEMBERS_COUNT_MIN
+              value: "{{ .Values.search.chan_members_count_min }}"
           stdin: true
           tty: true
           securityContext:

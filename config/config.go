@@ -30,6 +30,9 @@ type Config struct {
 		Level int `envconfig:"LOG_LEVEL" default:"-4" required:"true"`
 	}
 	Replica ReplicaConfig
+	Search  struct {
+		ChanMembersCountMin int32 `envconfig:"SEARCH_CHAN_MEMBERS_COUNT_MIN" default:"12345"`
+	}
 }
 
 type DbConfig struct {
@@ -38,9 +41,10 @@ type DbConfig struct {
 	UserName string `envconfig:"DB_USERNAME" default:""`
 	Password string `envconfig:"DB_PASSWORD" default:""`
 	Table    struct {
-		Name      string        `envconfig:"DB_TABLE_NAME" default:"tgchans" required:"true"`
-		Retention time.Duration `envconfig:"DB_TABLE_RETENTION" default:"2160h" required:"true"`
-		Shard     bool          `envconfig:"DB_TABLE_SHARD" default:"true"`
+		Name            string        `envconfig:"DB_TABLE_NAME" default:"tgchans" required:"true"`
+		Retention       time.Duration `envconfig:"DB_TABLE_RETENTION" default:"2160h" required:"true"`
+		Shard           bool          `envconfig:"DB_TABLE_SHARD" default:"true"`
+		RefreshInterval time.Duration `envconfig:"DB_TABLE_REFRESH_INTERVAL" default:"15m" required:"true"`
 	}
 	Tls struct {
 		Enabled  bool `envconfig:"DB_TLS_ENABLED" default:"false" required:"true"`
